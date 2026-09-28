@@ -29,8 +29,9 @@ npm run dev                   # http://localhost:5173
 Other commands:
 
 ```bash
-npm run build     # type-check and build to dist/
-npm run test:db   # run the database permission tests on a throwaway local Postgres
+npm run build      # type-check and build to dist/
+npm run test:unit  # unit tests for the Insights calculations
+npm run test:db    # run the database permission tests on a throwaway local Postgres
 ```
 
 `npm run test:db` needs Postgres 15+ installed locally but no Supabase account.

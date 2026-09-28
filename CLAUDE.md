@@ -14,7 +14,8 @@ Project owner is not a professional developer; explain changes in plain language
 - In SQL, compare possibly-null owners with `coalesce(x = auth.uid(), false)`; a bare `=` inside `not (...)` let a poster edit seeded (ownerless) posts once.
 - Sign-in is a 6-digit email code (verifyOtp type 'email'), limited to @ems-wi.com by a trigger on auth.users.
 - After launch, schema changes go in a new numbered migration; never edit an applied one.
-- Checks before pushing: `npm run build` and `npm run test:db` (add tests to `supabase/tests/permissions_test.sql` for new rules).
+- Checks before pushing: `npm run build`, `npm run test:unit` (Vitest, pure logic such as `src/lib/insights.test.ts`) and `npm run test:db` (add tests to `supabase/tests/permissions_test.sql` for new rules).
+- Admin Insights (`/admin/insights`): all math lives in `src/lib/insights.ts` (tuning constants at the top); charts are hand-made SVG in `src/components/insights/`. Chart colors `--series-interest` / `--series-commit` passed the dataviz palette validator for light and dark surfaces; re-run it if they change. Funnel and heatmap use one hue (brand) in steps.
 - Writing for the owner or the group: no em dashes.
 - Supabase grants anon/authenticated EXECUTE on new public functions by default: in each new migration, revoke from public/anon/authenticated and grant back only what the site calls.
 - Brand colors are at the top of src/styles.css, sampled from ems-wi.com screenshots (logo blue #226DA7, five dots #B1DEF6 #6BAEDB #0D6CB3 #094A7D #0B2440, heading indigo #0D0149, turquoise rule #25EFF5). Fonts are free lookalikes: Syncopate (wide caps headings), Cormorant Garamond italic (taglines), Figtree (body).

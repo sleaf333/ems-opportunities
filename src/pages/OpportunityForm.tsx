@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
 import { categoriesByOpportunity, fetchCategories, fetchOpportunity, fetchOpportunityCategories } from '../lib/data'
 import {
@@ -89,6 +89,8 @@ export default function OpportunityForm() {
   const editing = Boolean(id)
   const profile = useProfile()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const presetTopic = searchParams.get('topic')
   const [form, setForm] = useState<FormState>(() => ({
     title: '',
     type: 'committee',
@@ -122,7 +124,10 @@ export default function OpportunityForm() {
   useEffect(() => {
     if (!id) {
       fetchCategories()
-        .then(setCategories)
+        .then((cats) => {
+          setCategories(cats)
+          if (presetTopic && cats.some((c) => c.id === presetTopic && c.active)) setPicked([presetTopic])
+        })
         .catch((err: Error) => setLoadError(err.message))
       return
     }
@@ -138,7 +143,7 @@ export default function OpportunityForm() {
         setPicked((categoriesByOpportunity(links, cats).get(id) ?? []).map((c) => c.id))
       })
       .catch((err: Error) => setLoadError(err.message))
-  }, [id])
+  }, [id, presetTopic])
 
   const canPost = profile.role === 'poster' || profile.role === 'admin'
   const canEdit =

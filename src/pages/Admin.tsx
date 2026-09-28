@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import { useAuth, useProfile } from '../auth/AuthContext'
-import {
-  byId,
-  categoriesByOpportunity,
-  fetchCategories,
-  fetchOpportunities,
-  fetchOpportunityCategories,
-  fetchProfiles,
-  fetchSignups,
-  useLoader,
-} from '../lib/data'
+import AdminTabs from '../components/AdminTabs'
+import { type AdminData, BLANK_ENGAGEMENT, type Engagement, engagementByPerson, loadAdminData } from '../lib/adminData'
+import { byId, useLoader } from '../lib/data'
 import { downloadCsv, toCsv } from '../lib/csv'
 import {
   COMMITMENT_LABELS,
@@ -30,65 +23,10 @@ import {
   TYPE_LABELS,
 } from '../lib/format'
 import { EMAIL_DOMAIN, friendlyError, isAllowedEmail, supabase } from '../lib/supabase'
-import type {
-  InterestCategory,
-  MemberInterestCategory,
-  MemberInterests,
-  MemberPreset,
-  Opportunity,
-  Profile,
-  Signup,
-  SignupEvent,
-  UserRole,
-} from '../lib/types'
+import type { InterestCategory, Opportunity, Profile, Signup, UserRole } from '../lib/types'
 
 // Posts leaving the site within this many days are flagged for review.
 const ENDING_SOON_DAYS = 14
-
-async function loadAdminData() {
-  const [profiles, opportunities, signups, categories, links, events, interests, memberCats, presets] =
-    await Promise.all([
-      fetchProfiles(),
-      fetchOpportunities(),
-      fetchSignups(),
-      fetchCategories(),
-      fetchOpportunityCategories(),
-      supabase.from('signup_events').select('*').order('changed_at'),
-      supabase.from('member_interests').select('*'),
-      supabase.from('member_interest_categories').select('*'),
-      supabase.from('member_presets').select('*').order('email'),
-    ])
-  for (const r of [events, interests, memberCats, presets]) if (r.error) throw new Error(r.error.message)
-  return {
-    profiles,
-    opportunities,
-    signups,
-    categories,
-    topics: categoriesByOpportunity(links, categories),
-    events: events.data as SignupEvent[],
-    interests: interests.data as MemberInterests[],
-    memberCats: memberCats.data as MemberInterestCategory[],
-    presets: presets.data as MemberPreset[],
-  }
-}
-type AdminData = Awaited<ReturnType<typeof loadAdminData>>
-
-interface Engagement {
-  interested: number
-  committed: number
-  completed: number
-  withdrawn: number
-  everCommitted: boolean
-  lastActivity: string | null
-}
-const BLANK: Engagement = {
-  interested: 0,
-  committed: 0,
-  completed: 0,
-  withdrawn: 0,
-  everCommitted: false,
-  lastActivity: null,
-}
 
 interface RoleDraft {
   email: string
@@ -101,28 +39,7 @@ export default function Admin() {
   const { data, error, loading, reload } = useLoader(loadAdminData, [])
   const [roleDraft, setRoleDraft] = useState<RoleDraft | null>(null)
 
-  const engagement = useMemo(() => {
-    const map = new Map<string, Engagement>()
-    if (!data) return map
-    const get = (id: string) => {
-      let e = map.get(id)
-      if (!e) map.set(id, (e = { ...BLANK }))
-      return e
-    }
-    for (const s of data.signups) {
-      const e = get(s.user_id)
-      if (s.status === 'interested') e.interested++
-      else if (s.status === 'committed' || s.status === 'waitlisted') e.committed++
-      else if (s.status === 'completed') e.completed++
-      else e.withdrawn++
-    }
-    for (const ev of data.events) {
-      const e = get(ev.user_id)
-      if (['committed', 'waitlisted', 'completed'].includes(ev.to_status)) e.everCommitted = true
-      if (!e.lastActivity || ev.changed_at > e.lastActivity) e.lastActivity = ev.changed_at
-    }
-    return map
-  }, [data])
+  const engagement = useMemo(() => (data ? engagementByPerson(data) : new Map<string, Engagement>()), [data])
 
   if (profile.role !== 'admin') return <Navigate to="/" replace />
   if (error) return <p className="error">Could not load admin data: {error}</p>
@@ -133,7 +50,10 @@ export default function Admin() {
 
   return (
     <div className="stack-lg">
-      <h1>Admin</h1>
+      <div className="stack-sm">
+        <AdminTabs />
+        <h1>Admin</h1>
+      </div>
 
       <div className="stats">
         <div className="card stat"><strong>{data.profiles.length}</strong><span>members signed in</span></div>
@@ -582,7 +502,12 @@ function Members({
   const [search, setSearch] = useState('')
   const [positionFilter, setPositionFilter] = useState('')
   const [interestFilter, setInterestFilter] = useState('')
-  const [onlyUntapped, setOnlyUntapped] = useState(false)
+  // Insights links here with ?untapped=1 to open this filter.
+  const [searchParams] = useSearchParams()
+  const [onlyUntapped, setOnlyUntapped] = useState(searchParams.get('untapped') === '1')
+  useEffect(() => {
+    if (searchParams.get('untapped') === '1') document.getElementById('members')?.scrollIntoView()
+  }, [searchParams])
 
   const people = byId(data.profiles)
   const opps = byId(data.opportunities)
@@ -601,7 +526,7 @@ function Members({
       return false
     }
     if (onlyUntapped) {
-      const e = engagement.get(p.id) ?? BLANK
+      const e = engagement.get(p.id) ?? BLANK_ENGAGEMENT
       if (e.interested === 0 || e.everCommitted) return false
     }
     return true
@@ -615,7 +540,7 @@ function Members({
       toCsv(
         ['Name', 'Email', 'Position', 'Role', 'Interested now', 'Committed now', 'Completed', 'Withdrawn', 'Ever committed', 'Last activity', 'Interest topics', 'Other interests', 'Leadership goals', 'Joined'],
         data.profiles.map((p) => {
-          const e = engagement.get(p.id) ?? BLANK
+          const e = engagement.get(p.id) ?? BLANK_ENGAGEMENT
           const i = interestsByUser.get(p.id)
           return [
             p.full_name, p.email, p.position ? POSITION_LABELS[p.position] : '', ROLE_LABELS[p.role],
@@ -685,7 +610,7 @@ function Members({
   }
 
   return (
-    <section className="card stack">
+    <section id="members" className="card stack">
       <div className="row between wrap gap-sm">
         <h2>Members and engagement</h2>
         <div className="row wrap gap-sm">
@@ -741,7 +666,7 @@ function Members({
           </thead>
           <tbody>
             {rows.map((p) => {
-              const e = engagement.get(p.id) ?? BLANK
+              const e = engagement.get(p.id) ?? BLANK_ENGAGEMENT
               return (
                 <tr key={p.id}>
                   <td>

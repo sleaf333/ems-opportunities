@@ -17,6 +17,9 @@
   --hero-mid: var(--dot-4); /* middle of the hero gradient */
   --heading: var(--indigo);
   --on-brand: #ffffff; /* text on brand-colored buttons */
+  /* Chart series, checked with the dataviz palette validator (light surface). */
+  --series-interest: #0f9fb0;
+  --series-commit: #0d6cb3;
   --brand-2: #0a8a9c; /* physicians accent: deepened turquoise, readable on white */
   --brand-3: #3d2f99; /* shareholders accent: lifted indigo */
 }
@@ -62,6 +65,9 @@
     --hero-mid: #0c3a63;
     --heading: #eef3fa;
     --on-brand: #06121f;
+    /* Chart series, validated separately against the dark surface. */
+    --series-interest: #1aa89c;
+    --series-commit: #2f86d6;
     --brand-2: #3fd6e0;
     --brand-3: #a99cf5;
     --bg: #0b1320;
@@ -1270,8 +1276,8 @@ input[type='checkbox'] {
   gap: 0.2rem;
 }
 .stat strong {
-  font-family: var(--font-display);
-  font-size: 2rem;
+  font-family: var(--font);
+  font-size: 2.2rem;
   font-weight: 700;
   line-height: 1;
   color: var(--brand);
@@ -1435,4 +1441,265 @@ tr.expanded td {
 .flag-view {
   background: var(--surface-2);
   color: var(--muted);
+}
+
+/* ==========================================================================
+   Admin Insights (leadership pipeline)
+   ========================================================================== */
+
+.admin-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--hairline);
+}
+.admin-tabs a {
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.admin-tabs a.active {
+  background: var(--heading);
+  color: var(--surface);
+}
+
+.insights-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.insights-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+/* Let cards shrink to the screen; charts then measure their real width. */
+.insights-grid > *,
+.insights-filters .pills {
+  min-width: 0;
+}
+@media (min-width: 960px) {
+  .insights-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  }
+}
+.refetching {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.strong {
+  font-weight: 700;
+}
+.btn-small {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* Funnel: one hue, stepped; 24px bars, rounded end, square at the baseline. */
+.funnel {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+}
+.funnel-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 11rem) 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+.funnel-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.funnel-track {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  outline-offset: 2px;
+  cursor: default;
+}
+.funnel-bar {
+  display: block;
+  height: 24px;
+  border-radius: 0 4px 4px 0;
+  transition: filter 0.15s;
+}
+.funnel-track:hover .funnel-bar,
+.funnel-track:focus-visible .funnel-bar {
+  filter: brightness(1.08);
+}
+.funnel-value {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  min-width: 4.5rem;
+  text-align: right;
+}
+.funnel-untapped {
+  justify-self: start;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+@media (max-width: 520px) {
+  .funnel-row {
+    grid-template-columns: 1fr auto;
+  }
+  .funnel-label {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Charts */
+.chart-frame {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.chart-frame svg {
+  display: block;
+  overflow: visible;
+}
+.chart-frame .grid {
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+.chart-frame .baseline {
+  stroke: color-mix(in srgb, var(--text) 25%, transparent);
+  stroke-width: 1;
+}
+.chart-frame .axis {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-frame .value-label {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+.chart-frame .hit {
+  fill: transparent;
+  outline: none;
+}
+.chart-frame .hit:hover,
+.chart-frame .hit:focus-visible {
+  fill: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+/* Tooltip: value leads, label follows; line keys, not boxes. */
+.chart-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  min-width: 9rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lift), 0 0 0 1px var(--hairline);
+  font-size: 0.82rem;
+}
+.chart-tip-title {
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.chart-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.chart-tip-row strong {
+  font-size: 0.95rem;
+}
+.chart-tip-row span:last-child {
+  color: var(--muted);
+}
+.chart-tip-key {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* Heatmap */
+.heatmap-wrap {
+  position: relative;
+}
+.heatmap th[scope='row'] {
+  font-weight: 600;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.heatmap td.heat-cell {
+  text-align: center;
+  font-weight: 700;
+  min-width: 4.2rem;
+  border: 2px solid var(--surface);
+  border-radius: 6px;
+  cursor: default;
+  outline-offset: -2px;
+}
+.heatmap td.heat-cell:hover,
+.heatmap td.heat-cell:focus-visible {
+  outline: 2px solid var(--heading);
+}
+.heatmap .heatmap-total {
+  color: var(--muted);
+  border-left: 1px solid var(--hairline);
+}
+.heatmap th.num {
+  text-align: center;
+}
+
+/* Rising stars */
+.stars td {
+  vertical-align: middle;
+}
+.stars .goals {
+  max-width: 18rem;
+  color: var(--muted);
+}
+.sparkline {
+  display: block;
+}
+
+/* Gaps */
+.gaps {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 860px) {
+  .gaps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.gap-col > * + * {
+  margin-top: 0.5rem;
 }

@@ -1,10 +1,11 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import BrandLogo from './BrandLogo'
 
 export default function Layout() {
   const profile = useProfile()
   const { signOut } = useAuth()
+  const location = useLocation()
   const canPost = profile.role === 'poster' || profile.role === 'admin'
 
   return (
@@ -18,7 +19,7 @@ export default function Layout() {
             <NavLink to="/" end>Opportunities</NavLink>
             <NavLink to="/mine">My sign-ups</NavLink>
             {canPost && <NavLink to="/new">Post</NavLink>}
-            {profile.role === 'admin' && <NavLink to="/admin">Admin</NavLink>}
+            {profile.role === 'admin' && <NavLink to="/admin/insights" className={({ isActive }) => (isActive || location.pathname === '/admin' ? 'active' : '')}>Admin</NavLink>}
             <NavLink to="/profile">Profile</NavLink>
             <button className="btn btn-link nav-signout" onClick={() => void signOut()}>
               Sign out
