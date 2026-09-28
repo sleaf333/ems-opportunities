@@ -35,7 +35,7 @@ export default function CompleteProfile() {
       <form className="card login-card stack" onSubmit={save}>
         <h1>Welcome</h1>
         <p className="muted">
-          Tell us who you are. Your name shows on the opportunities you sign up for.
+          Tell us who you are. When you sign up for something, admins and the person who posted it see your name.
         </p>
         <label className="field">
           <span>Full name</span>
@@ -67,7 +67,10 @@ export default function CompleteProfile() {
                 </option>
               ))}
             </select>
-            <small>Shareholders: choose your closest match for now. An admin marks shareholders.</small>
+            <small>
+              Shareholder is not listed because an admin sets it. Shareholders: choose Shareholder track for now and
+              an admin will update it.
+            </small>
           </label>
         )}
         <button className="btn btn-primary" disabled={busy || !fullName.trim() || !position}>
