@@ -1306,3 +1306,116 @@ td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* ==========================================================================
+   Locations, names privacy, admin topics (0002)
+   ========================================================================== */
+
+.opp-location {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.opp-location svg {
+  color: var(--accent);
+  flex: none;
+}
+.opp-format {
+  margin-left: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.count-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+}
+.count-row strong {
+  font-size: 1.4rem;
+  color: var(--heading);
+  margin-right: 0.2rem;
+}
+.names-hidden {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.required {
+  font-weight: 600;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+.optional {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.field-narrow {
+  max-width: 260px;
+}
+.check-top {
+  align-items: flex-start;
+  white-space: normal;
+}
+.check-top input {
+  margin-top: 0.3rem;
+}
+.block {
+  display: block;
+}
+.chip-retired {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.grow {
+  flex: 1;
+  min-width: 200px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+td.attention {
+  color: var(--warning);
+  font-weight: 700;
+}
+tr.expanded td {
+  background: var(--surface-2);
+}
+.topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.2rem 0.3rem 0.2rem 0.8rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.topic-chip .btn-link {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.35rem;
+}
+.topic-retired {
+  opacity: 0.6;
+}
+.topic-retired > :first-child {
+  text-decoration: line-through;
+}
+@media (min-width: 720px) {
+  .filters.filters-4 {
+    grid-template-columns: 2fr 1fr 1fr auto;
+  }
+}
+.card h3 {
+  margin-bottom: 0.4rem;
+}

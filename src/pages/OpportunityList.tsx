@@ -1,17 +1,45 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Search, Sprout } from 'lucide-react'
+import { ArrowRight, MapPin, Search, Sprout } from 'lucide-react'
 import { useProfile } from '../auth/AuthContext'
 import { AvatarStack } from '../components/Avatars'
 import OppIcon from '../components/OppIcon'
-import { byId, fetchOpportunities, fetchProfiles, fetchSignups, useLoader } from '../lib/data'
-import { COMMITMENT_LABELS, formatDate, TYPE_LABELS } from '../lib/format'
-import type { CommitmentLevel, Opportunity, OppAudience, OppType, Profile, Signup } from '../lib/types'
+import {
+  byId,
+  categoriesByOpportunity,
+  fetchCategories,
+  fetchCounts,
+  fetchOpportunities,
+  fetchOpportunityCategories,
+  fetchProfiles,
+  fetchSignups,
+  useLoader,
+} from '../lib/data'
+import {
+  COMMITMENT_LABELS,
+  FORMAT_LABELS,
+  formatDate,
+  isExpired,
+  locationText,
+  REGION_LABELS,
+  TYPE_LABELS,
+} from '../lib/format'
+import type {
+  CommitmentLevel,
+  InterestCategory,
+  Opportunity,
+  OppAudience,
+  OppRegion,
+  OppType,
+  Profile,
+  Signup,
+  SignupCounts,
+} from '../lib/types'
 
 const SECTIONS: { audience: OppAudience; title: string; blurb: string }[] = [
   { audience: 'all', title: 'Open to everyone', blurb: 'Physicians, APCs and staff' },
   { audience: 'physicians', title: 'For physicians', blurb: 'Anyone can show interest' },
-  { audience: 'shareholders', title: 'For shareholders', blurb: 'Anyone can show interest' },
+  { audience: 'partners', title: 'For partners', blurb: 'Anyone can show interest' },
 ]
 
 const TYPE_PLURALS: Record<OppType, string> = {
@@ -22,43 +50,48 @@ const TYPE_PLURALS: Record<OppType, string> = {
   other: 'Other',
 }
 
-interface Tally {
-  committed: Profile[]
-  interested: number
-  waitlisted: number
+const NO_COUNTS: SignupCounts = { opportunity_id: '', committed: 0, interested: 0, waitlisted: 0 }
+
+async function loadBoard() {
+  const [opportunities, signups, profiles, counts, categories, links] = await Promise.all([
+    fetchOpportunities(),
+    fetchSignups(), // only rows this person may see (their own, their posts, or names shown)
+    fetchProfiles(),
+    fetchCounts(),
+    fetchCategories(),
+    fetchOpportunityCategories(),
+  ])
+  return { opportunities, signups, profiles, counts, categories, topics: categoriesByOpportunity(links, categories) }
 }
 
 export default function OpportunityList() {
   const profile = useProfile()
-  const { data, error, loading } = useLoader(
-    () => Promise.all([fetchOpportunities(), fetchSignups(), fetchProfiles()]),
-    [],
-  )
+  const { data, error, loading } = useLoader(loadBoard, [])
   const [search, setSearch] = useState('')
   const [type, setType] = useState<OppType | ''>('')
+  const [region, setRegion] = useState<OppRegion | ''>('')
   const [commitment, setCommitment] = useState<CommitmentLevel | ''>('')
-  const [tag, setTag] = useState('')
+  const [topic, setTopic] = useState('')
   const [newHireOnly, setNewHireOnly] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
 
-  const opportunities: Opportunity[] = data?.[0] ?? []
-  const signups: Signup[] = data?.[1] ?? []
-  const profiles: Profile[] = data?.[2] ?? []
+  const canSeeExpired = profile.role === 'admin' || profile.role === 'poster'
+  const opportunities: Opportunity[] = data?.opportunities ?? []
+  const signups: Signup[] = data?.signups ?? []
+  const topics = data?.topics ?? new Map<string, InterestCategory[]>()
 
-  const tallies = useMemo(() => {
-    const people = byId(profiles)
-    const map = new Map<string, Tally>()
+  // Faces on cards: only people this viewer is allowed to see.
+  const faces = useMemo(() => {
+    const people = byId<Profile>(data?.profiles ?? [])
+    const map = new Map<string, Profile[]>()
     for (const s of signups) {
-      const t = map.get(s.opportunity_id) ?? { committed: [], interested: 0, waitlisted: 0 }
-      if (s.status === 'committed' || s.status === 'completed') {
-        const p = people.get(s.user_id)
-        if (p) t.committed.push(p)
-      } else if (s.status === 'interested') t.interested++
-      else if (s.status === 'waitlisted') t.waitlisted++
-      map.set(s.opportunity_id, t)
+      if (s.status !== 'committed' && s.status !== 'completed') continue
+      const p = people.get(s.user_id)
+      if (!p) continue
+      map.set(s.opportunity_id, [...(map.get(s.opportunity_id) ?? []), p])
     }
     return map
-  }, [signups, profiles])
+  }, [signups, data?.profiles])
 
   const mine = useMemo(() => {
     const map = new Map<string, Signup>()
@@ -66,28 +99,33 @@ export default function OpportunityList() {
     return map
   }, [signups, profile.id])
 
-  const openCount = opportunities.filter((o) => o.status === 'open').length
-  const involved = new Set(
-    signups.filter((s) => ['interested', 'committed', 'waitlisted', 'completed'].includes(s.status)).map((s) => s.user_id),
-  ).size
+  const live = opportunities.filter((o) => o.status === 'open' && !isExpired(o))
+  const totalSignups = live.reduce((sum, o) => {
+    const c = data?.counts.get(o.id) ?? NO_COUNTS
+    return sum + c.committed + c.interested + c.waitlisted
+  }, 0)
   const presentTypes = (Object.keys(TYPE_LABELS) as OppType[]).filter((t) => opportunities.some((o) => o.type === t))
-  const allTags = [...new Set(opportunities.flatMap((o) => o.tags))].sort()
+  const activeTopics = (data?.categories ?? []).filter((c) => c.active)
 
   const visible = opportunities.filter((o) => {
     if (o.status === 'archived') return false
-    if (!showClosed && o.status === 'closed') return false
+    // "Show closed" also reveals expired posts to posters and admins.
+    if (!showClosed && (o.status === 'closed' || isExpired(o))) return false
+    if (isExpired(o) && !canSeeExpired) return false
     if (type && o.type !== type) return false
+    if (region && o.region !== region) return false
     if (commitment && o.commitment !== commitment) return false
-    if (tag && !o.tags.includes(tag)) return false
+    if (topic && !(topics.get(o.id) ?? []).some((c) => c.id === topic)) return false
     if (newHireOnly && !o.new_hire_friendly) return false
     if (search) {
-      const haystack = `${o.title} ${o.description} ${o.tags.join(' ')}`.toLowerCase()
+      const names = (topics.get(o.id) ?? []).map((c) => c.name).join(' ')
+      const haystack = `${o.title} ${o.description} ${names} ${o.site}`.toLowerCase()
       if (!haystack.includes(search.toLowerCase())) return false
     }
     return true
   })
-  const rank = { open: 0, draft: 1, closed: 2, archived: 3 }
-  visible.sort((a, b) => rank[a.status] - rank[b.status] || a.title.localeCompare(b.title))
+  const rank = (o: Opportunity) => (o.status === 'open' && !isExpired(o) ? 0 : o.status === 'draft' ? 1 : 2)
+  visible.sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title))
 
   return (
     <div className="stack-lg">
@@ -105,7 +143,7 @@ export default function OpportunityList() {
           <Search size={18} aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search by name or topic"
+            placeholder="Search by name, topic or hospital"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search opportunities"
@@ -114,10 +152,10 @@ export default function OpportunityList() {
         {data && (
           <div className="hero-stats">
             <span>
-              <strong>{openCount}</strong> open now
+              <strong>{live.length}</strong> open now
             </span>
             <span>
-              <strong>{involved}</strong> {involved === 1 ? 'colleague' : 'colleagues'} involved
+              <strong>{totalSignups}</strong> {totalSignups === 1 ? 'sign-up' : 'sign-ups'} so far
             </span>
           </div>
         )}
@@ -150,10 +188,21 @@ export default function OpportunityList() {
           </button>
         </div>
         <div className="toolbar-selects">
-          <select className="pill-select" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Topic">
+          <select
+            className="pill-select"
+            value={region}
+            onChange={(e) => setRegion(e.target.value as OppRegion | '')}
+            aria-label="Location"
+          >
+            <option value="">Any location</option>
+            {Object.entries(REGION_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <select className="pill-select" value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="Topic">
             <option value="">Any topic</option>
-            {allTags.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            {activeTopics.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
           <select
@@ -170,7 +219,7 @@ export default function OpportunityList() {
           <label className="switch">
             <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
             <span className="switch-track" aria-hidden="true" />
-            Show closed
+            {canSeeExpired ? 'Show closed and expired' : 'Show closed'}
           </label>
         </div>
       </div>
@@ -194,7 +243,9 @@ export default function OpportunityList() {
                 <OpportunityCard
                   key={opp.id}
                   opp={opp}
-                  tally={tallies.get(opp.id) ?? { committed: [], interested: 0, waitlisted: 0 }}
+                  counts={data?.counts.get(opp.id) ?? NO_COUNTS}
+                  faces={faces.get(opp.id) ?? []}
+                  topics={topics.get(opp.id) ?? []}
                   mine={mine.get(opp.id)}
                 />
               ))}
@@ -213,44 +264,64 @@ const MY_LABELS: Partial<Record<Signup['status'], string>> = {
   waitlisted: 'Waitlisted',
 }
 
-function OpportunityCard({ opp, tally, mine }: { opp: Opportunity; tally: Tally; mine?: Signup }) {
+function OpportunityCard({
+  opp,
+  counts,
+  faces,
+  topics,
+  mine,
+}: {
+  opp: Opportunity
+  counts: SignupCounts
+  faces: Profile[]
+  topics: InterestCategory[]
+  mine?: Signup
+}) {
   const summary = opp.description
     .split('\n')
     .map((l) => l.replace(/^[-*•]\s+/, '').trim())
     .filter(Boolean)[0]
-  const taken = tally.committed.length
+  const taken = counts.committed
+  const expired = isExpired(opp)
   const myLabel = mine ? MY_LABELS[mine.status] : undefined
   const meta = [TYPE_LABELS[opp.type], opp.time_estimate || COMMITMENT_LABELS[opp.commitment]]
   if (opp.start_date) meta.push(formatDate(opp.start_date))
 
   let footText: string
-  if (taken === 0 && tally.interested === 0) footText = 'Be the first to raise your hand'
+  if (taken === 0 && counts.interested === 0 && counts.waitlisted === 0) footText = 'Be the first to raise your hand'
   else {
     const parts = []
     if (taken) parts.push(`${taken} in`)
-    if (tally.interested) parts.push(`${tally.interested} interested`)
-    if (tally.waitlisted) parts.push(`${tally.waitlisted} waiting`)
+    if (counts.interested) parts.push(`${counts.interested} interested`)
+    if (counts.waitlisted) parts.push(`${counts.waitlisted} waiting`)
     footText = parts.join(' · ')
   }
 
   return (
     <Link
       to={`/o/${opp.id}`}
-      className={`opp opp-${opp.audience} ${opp.status !== 'open' ? 'opp-muted' : ''}`}
+      className={`opp opp-${opp.audience} ${opp.status !== 'open' || expired ? 'opp-muted' : ''}`}
     >
       <div className="opp-top">
         <span className="opp-icon">
-          <OppIcon opp={opp} />
+          <OppIcon type={opp.type} topics={topics.map((t) => t.name)} />
         </span>
         <span className="opp-flags">
           {opp.status === 'draft' && <span className="flag">Draft</span>}
           {opp.status === 'closed' && <span className="flag">Closed</span>}
+          {expired && <span className="flag">Expired</span>}
           {myLabel && <span className={`flag flag-mine flag-${mine!.status}`}>{myLabel}</span>}
         </span>
       </div>
 
       <h3 className="opp-title">{opp.title}</h3>
       {summary && <p className="opp-summary">{summary}</p>}
+
+      <p className="opp-location">
+        <MapPin size={14} aria-hidden="true" />
+        {locationText(opp)}
+        {opp.format !== 'in_person' && <span className="opp-format">{FORMAT_LABELS[opp.format]}</span>}
+      </p>
 
       <p className="opp-meta">
         {meta.join(' · ')}
@@ -272,11 +343,11 @@ function OpportunityCard({ opp, tally, mine }: { opp: Opportunity; tally: Tally;
         </div>
       )}
 
-      {opp.signup_deadline && opp.status === 'open' && (
+      {opp.signup_deadline && opp.status === 'open' && !expired && (
         <span className="opp-deadline">Sign up by {formatDate(opp.signup_deadline)}</span>
       )}
       <div className="opp-foot">
-        <AvatarStack people={tally.committed} size={28} />
+        <AvatarStack people={faces} size={28} />
         <span className="opp-foot-text">{footText}</span>
         <ArrowRight className="opp-arrow" size={18} aria-hidden="true" />
       </div>

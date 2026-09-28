@@ -3,6 +3,8 @@ import type {
   MemberPosition,
   Opportunity,
   OppAudience,
+  OppFormat,
+  OppRegion,
   OppStatus,
   OppType,
   Profile,
@@ -27,7 +29,21 @@ export const COMMITMENT_LABELS: Record<CommitmentLevel, string> = {
 export const AUDIENCE_LABELS: Record<OppAudience, string> = {
   all: 'All team members',
   physicians: 'Physicians',
-  shareholders: 'Shareholders',
+  partners: 'Partners',
+}
+
+export const REGION_LABELS: Record<OppRegion, string> = {
+  group_wide: 'Group-wide',
+  door_county: 'Door County',
+  fox_valley: 'Fox Valley',
+  milwaukee: 'Milwaukee',
+  watertown: 'Watertown',
+}
+
+export const FORMAT_LABELS: Record<OppFormat, string> = {
+  in_person: 'In person',
+  virtual: 'Virtual',
+  hybrid: 'Hybrid',
 }
 
 export const STATUS_LABELS: Record<OppStatus, string> = {
@@ -47,9 +63,18 @@ export const SIGNUP_LABELS: Record<SignupStatus, string> = {
 }
 
 export const POSITION_LABELS: Record<MemberPosition, string> = {
-  physician: 'Physician',
+  employed_physician: 'Employed physician',
+  partnership_track: 'Partnership track',
+  partner: 'Partner',
   apc: 'APC',
-  staff: 'Staff',
+  admin_staff: 'Administrative staff',
+}
+
+// Positions members can choose for themselves. Partner is set by an admin.
+export const SELF_POSITIONS: MemberPosition[] = ['employed_physician', 'partnership_track', 'apc', 'admin_staff']
+
+export function isPhysician(position: MemberPosition | null): boolean {
+  return position === 'employed_physician' || position === 'partnership_track' || position === 'partner'
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -95,21 +120,33 @@ export function deadlinePassed(opp: Opportunity): boolean {
 }
 
 export function canCommit(opp: Opportunity, profile: Profile): boolean {
-  if (opp.audience === 'physicians') return profile.position === 'physician'
-  if (opp.audience === 'shareholders') return profile.is_shareholder
+  if (opp.audience === 'physicians') return isPhysician(profile.position)
+  if (opp.audience === 'partners') return profile.position === 'partner'
   return true
+}
+
+// Past its "show on site until" date. Kept in the database, hidden from the list.
+export function isExpired(opp: Opportunity): boolean {
+  return Boolean(opp.visible_until && opp.visible_until < localToday())
+}
+
+export function addDays(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d + days))
+  return date.toISOString().slice(0, 10)
+}
+
+export function daysUntil(isoDate: string): number {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const [ty, tm, td] = localToday().split('-').map(Number)
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86400000)
+}
+
+export function locationText(opp: Pick<Opportunity, 'region' | 'site'>): string {
+  return REGION_LABELS[opp.region] + (opp.site.trim() ? ` · ${opp.site.trim()}` : '')
 }
 
 export function displayName(profile: Pick<Profile, 'full_name' | 'email'> | undefined): string {
   if (!profile) return 'Unknown'
   return profile.full_name.trim() || profile.email
-}
-
-export function parseTags(value: string): string[] {
-  const seen = new Set<string>()
-  for (const raw of value.split(',')) {
-    const tag = raw.trim().toLowerCase()
-    if (tag) seen.add(tag)
-  }
-  return [...seen]
 }

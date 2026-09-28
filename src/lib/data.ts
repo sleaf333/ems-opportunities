@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import type { Opportunity, Profile, Signup } from './types'
+import type { InterestCategory, Opportunity, OpportunityCategory, Profile, Signup, SignupCounts } from './types'
 
 // The group is small (~150 people), so pages load whole tables and filter in
 // the browser. Row-level security still decides what each person receives.
@@ -31,6 +31,38 @@ export function fetchSignupsFor(opportunityId: string): Promise<Signup[]> {
 
 export function fetchProfiles(): Promise<Profile[]> {
   return unwrap(supabase.from('profiles').select('*').order('full_name'))
+}
+
+export function fetchCategories(): Promise<InterestCategory[]> {
+  return unwrap(supabase.from('interest_categories').select('*').order('name'))
+}
+
+export function fetchOpportunityCategories(): Promise<OpportunityCategory[]> {
+  return unwrap(supabase.from('opportunity_categories').select('*'))
+}
+
+// Counts without names, for everyone (names depend on who is looking).
+export async function fetchCounts(): Promise<Map<string, SignupCounts>> {
+  const rows = await unwrap<SignupCounts[]>(supabase.rpc('opportunity_counts'))
+  return new Map(rows.map((r) => [r.opportunity_id, r]))
+}
+
+// Category names per opportunity, sorted.
+export function categoriesByOpportunity(
+  links: OpportunityCategory[],
+  categories: InterestCategory[],
+): Map<string, InterestCategory[]> {
+  const cats = byId(categories)
+  const map = new Map<string, InterestCategory[]>()
+  for (const link of links) {
+    const cat = cats.get(link.category_id)
+    if (!cat) continue
+    const list = map.get(link.opportunity_id) ?? []
+    list.push(cat)
+    map.set(link.opportunity_id, list)
+  }
+  for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name))
+  return map
 }
 
 export function byId<T extends { id: string }>(rows: T[]): Map<string, T> {

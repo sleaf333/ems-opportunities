@@ -17,15 +17,19 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 | Role | Who | Can do |
 |---|---|---|
 | Member | Anyone with an @ems-wi.com email | Browse, express interest, commit, withdraw, edit own profile |
-| Shareholder | A flag an admin sets on a member | Can commit to shareholder-only committees |
+| Partner | A position only an admin can assign | Can commit to partners-only committees (partners are the shareholders) |
 | Poster | Members an admin has approved | Everything a member can, plus create and manage their own opportunities and mark attendance. Posts go live immediately; admins do not review them first. |
 | Admin | Project owner and anyone they appoint | Everything, plus manage roles, edit or close any post, see all engagement data, export data |
 
 **Access control:** only @ems-wi.com addresses can create an account. That domain includes only group members (physicians, APCs, admin staff), so no separate roster is needed. Each profile has a **position** field (Physician / APC / Staff) so reports can be filtered.
 
-**Who can commit:** each opportunity is open to all team members, physicians only, or shareholders only (matching the committee brochure). Anyone can mark themselves **Interested** in anything, so interest in, say, the Finance Committee from someone who is not yet a shareholder is still recorded.
+**Positions:** Employed physician, Partnership track, Partner, APC, Administrative staff. Members pick their own, except Partner, which only an admin can set or remove.
 
-**First admin:** the project owner, set up with one SQL statement during setup (see docs/SETUP.md). Admins add other posters, admins and shareholders by email on the Admin page, even before those people have signed in.
+**Who can commit:** each opportunity is open to all team members, physicians only (employed, partnership track and partners), or partners only (matching the committee brochure). Anyone can mark themselves **Interested** in anything, so interest in, say, the Finance Committee from someone who is not yet a partner is still recorded.
+
+**Who sees names:** admins and the person who posted an opportunity always see who signed up. Other members see only counts, unless the poster turns on "Show names to members" for that post.
+
+**First admin:** the project owner, set up with one SQL statement during setup (see docs/SETUP.md). Admins add other posters, admins and partners by email on the Admin page, even before those people have signed in.
 
 ## Features by phase
 
@@ -38,7 +42,7 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 ### Phase 1: MVP (built)
 - [x] Sign in with a 6-digit code sent by email, accepted only for @ems-wi.com addresses
 - [x] Profiles: name, position (Physician/APC/Staff), areas of interest (tags), optional short "leadership goals" note
-- [x] Admin panel: grant or remove Poster and Admin roles and the Shareholder flag by email, including for people who have not signed in yet
+- [x] Admin panel: grant or remove Poster and Admin roles and Partner status by email, including for people who have not signed in yet
 - [x] Posting opportunities (Poster/Admin): title, type, description, who can commit, time commitment, dates, number of spots, sign-up deadline, contact person, "good for new hires" label, tags, draft/open/closed/archived
 - [x] Starting content: the 15 committees from the brochure
 - [x] Browse and filter: by type, tag, time commitment, "good for new hires", open/closed, text search
@@ -50,6 +54,15 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 - [x] Admin engagement table with an "Interested but never committed" filter
 - [x] CSV exports of members, opportunities, sign-ups and history (admin); these also serve as the backup
 - [x] Every opportunity has its own link to paste into the newsletter; people who are not signed in land there after signing in
+
+### Phase 1.5: Second round (built)
+- [x] Positions: Employed physician, Partnership track, Partner (admin-set), APC, Administrative staff
+- [x] "Shareholders only" became "Partners only"; the separate shareholder flag was removed
+- [x] Required location (Door County, Fox Valley, Milwaukee, Watertown, Group-wide), optional hospital/site, meeting format, and a location filter
+- [x] "Show on site until" date, separate from the activity dates: committees default to indefinitely, other posts to 180 days; expired posts leave the list but are never deleted; admins see posts ending soon and expired posts
+- [x] Nobody can delete an opportunity through the site; close or archive instead
+- [x] Names of who signed up: admins and the poster always; members only when the poster turns on "Show names to members" (off by default); counts are always shown
+- [x] Curated topic list shared by opportunities and member interests, managed by admins; members add write-in interests; admins see who is interested in each topic and can email them
 
 ### Phase 2: Engagement dashboard
 - [ ] Posters mark attendance or completion (in bulk: "everyone attended" with exceptions)
@@ -86,9 +99,11 @@ This is what will be recorded:
 
 ## Data model
 
-The real definitions are in `supabase/migrations/0001_init.sql`. In short:
+The real definitions are in `supabase/migrations/`. In short:
 
-- **profiles**: name, email, position, role (member/poster/admin), shareholder flag
+- **profiles**: name, email, position (employed physician / partnership track / partner / APC / administrative staff), role (member/poster/admin)
+- **interest_categories**: the curated topic list (admins add, rename, retire; never deleted)
+- **opportunity_categories** / **member_interest_categories**: which topics each opportunity has and which each member picked
 - **member_interests**: interests and leadership goals (private to the member and admins)
 - **member_presets**: roles an admin set for people who have not signed in yet
 - **opportunities**: title, type, description, who can commit, time commitment, time needed, dates, deadline, spots, new-hire label, topics, contact, status
@@ -140,7 +155,14 @@ The real definitions are in `supabase/migrations/0001_init.sql`. In short:
 | 2026-09-28 | Must cost $0 per month: Supabase free + Cloudflare Pages free + a free email-sending plan |
 | 2026-09-28 | Start on free `*.pages.dev`; project owner is the first admin and adds others by email |
 | 2026-09-28 | Seed the site with the 15 committees from the brochure, with "who can commit" set to all / physicians / shareholders as the brochure groups them |
-| 2026-09-28 | Anyone can mark Interested in any opportunity; committing is limited by position or the shareholder flag |
+| 2026-09-28 | Anyone can mark Interested in any opportunity; committing is limited by position |
 | 2026-09-28 | Sign in with a typed 6-digit code, not a clickable link, because Microsoft 365 link scanning can use up one-time links; codes also work across devices |
 | 2026-09-28 | Brevo for sign-in emails (Resend needs a domain we own) |
 | 2026-09-28 | Match ems-wi.com branding: colors sampled from site screenshots; free lookalike fonts (Syncopate, Cormorant Garamond, Figtree); EMS five-dot mark recreated in code |
+| 2026-09-28 | Partners are the shareholders: one Partner position, set only by admins; "Partners only" replaces "Shareholders only" |
+| 2026-09-28 | Staff position renamed Administrative staff; physicians split into Employed physician and Partnership track |
+| 2026-09-28 | Names of who signed up: hidden from members by default; the poster can show them per post; admins and the poster always see them |
+| 2026-09-28 | Posting window: committees indefinite by default, other posts 180 days, picked on a calendar or "indefinitely"; expired posts kept for history |
+| 2026-09-28 | Opportunities are never deleted through the site |
+| 2026-09-28 | Every post needs a location: Door County, Fox Valley, Milwaukee, Watertown or Group-wide; hospital/site optional |
+| 2026-09-28 | Interests come from one admin-managed topic list, shared with opportunity topics, plus an optional write-in |

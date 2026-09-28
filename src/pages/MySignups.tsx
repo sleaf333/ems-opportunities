@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
 import { SignupBadge } from '../components/Badges'
 import { byId, fetchOpportunities, useLoader } from '../lib/data'
-import { formatDate, TYPE_LABELS } from '../lib/format'
+import { formatDate, locationText, TYPE_LABELS } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { Opportunity, Signup } from '../lib/types'
 
@@ -62,7 +62,7 @@ function SignupTable({
                   {opp ? <Link to={`/o/${opp.id}`}>{opp.title}</Link> : 'Removed opportunity'}
                   {opp && (
                     <div className="small muted">
-                      {TYPE_LABELS[opp.type]}
+                      {TYPE_LABELS[opp.type]} · {locationText(opp)}
                       {opp.start_date ? ` · ${formatDate(opp.start_date)}` : ''}
                     </div>
                   )}
