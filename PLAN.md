@@ -66,7 +66,7 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 
 ### Phase 2: Engagement dashboard
 - [ ] Posters mark attendance or completion (in bulk: "everyone attended" with exceptions)
-- [ ] Richer dashboard: trends over time, by position and by type
+- [x] Admin Insights ("Leadership pipeline"): engagement funnel, activity by month, rising stars, interest heatmap by location and by position, and gaps (topics wanted with no post, quiet posts, locations with nothing open), filterable by time range and position
 
 ### Phase 3: Optional extras
 - [ ] Automatic weekly email digest (only if manual newsletter links fall short; see the email limits under "Technology")
@@ -171,3 +171,4 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-28 | Who can sign up is a per-post list of positions (replaces everyone / physicians / shareholders). Ineligible people can view but not mark Interested or Commit |
 | 2026-09-28 | Shareholder-track posts are open to shareholder track and shareholders; employed physicians cannot join shareholder or shareholder-track posts |
 | 2026-09-28 | Administrative staff join only administrative-staff posts and posts open to everyone; the brochure's "All Team Members" committees are open to everyone, including administrative staff |
+| 2026-09-28 | Add an admin Insights page to spot rising leaders and unmet interest; computed in the browser from existing data, no database change. Attendance marking deferred |

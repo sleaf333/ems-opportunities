@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import { isConfigured } from './lib/supabase'
 import Admin from './pages/Admin'
 import CompleteProfile from './pages/CompleteProfile'
+import Insights from './pages/Insights'
 import Login from './pages/Login'
 import MySignups from './pages/MySignups'
 import NotFound from './pages/NotFound'
@@ -52,6 +53,7 @@ function Gate() {
         <Route path="mine" element={<MySignups />} />
         <Route path="profile" element={<Profile />} />
         <Route path="admin" element={<Admin />} />
+        <Route path="admin/insights" element={<Insights />} />
         <Route path="privacy" element={<Privacy />} />
         <Route path="*" element={<NotFound />} />
       </Route>
