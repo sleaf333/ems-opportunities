@@ -7,7 +7,7 @@ Project owner is not a professional developer; explain changes in plain language
 - All authorization lives in SQL (`supabase/migrations/`): RLS policies, column grants and SECURITY DEFINER functions (`set_my_signup`, `admin_set_member`). The UI only mirrors those rules for display; never rely on UI checks for security.
 - Sign-ups are written only through `set_my_signup` (handles capacity, waitlist, eligibility by position, posting window and deadlines in America/Chicago). Every change is logged to `signup_events` by trigger.
 - Labels: the database says partner / partnership_track / audience 'partners'; everything people see says Shareholder / Shareholder track / Shareholders only (labels in src/lib/format.ts; friendlyError rewrites DB messages). Never show "partner" wording.
-- Partner (shown as Shareholder) is a position only admins can set (trigger `guard_partner_position`; `admin_set_member`). Partners-only = position 'partner'; physicians = employed_physician, partnership_track, partner.
+- Partner (shown as Shareholder) is self-selected like any position (0003 removed the admin-only guard); admins can also set it via `admin_set_member`. Partners-only = position 'partner'; physicians = employed_physician, partnership_track, partner.
 - Names on sign-ups: RLS lets members read only their own rows unless the post has `show_names`; admins and the post's creator see all. Counts for everyone come from `opportunity_counts()`.
 - Nothing is deleted: no DELETE on opportunities or interest_categories; expiry is `visible_until` (null = indefinitely), close/archive via status.
 - Topics and member interests use `interest_categories` (+ join tables), written via `set_opportunity_categories` / `set_my_interests`.

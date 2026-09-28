@@ -8,7 +8,6 @@ import type { InterestCategory, MemberInterestCategory, MemberInterests, MemberP
 export default function Profile() {
   const profile = useProfile()
   const { refreshProfile } = useAuth()
-  const isPartner = profile.position === 'partner'
   const [fullName, setFullName] = useState(profile.full_name)
   const [position, setPosition] = useState<MemberPosition>(profile.position ?? 'employed_physician')
   const [categories, setCategories] = useState<InterestCategory[]>([])
@@ -46,11 +45,8 @@ export default function Profile() {
     setBusy(true)
     setMessage(null)
     setError(null)
-    const profileUpdate = isPartner
-      ? { full_name: fullName.trim() }
-      : { full_name: fullName.trim(), position }
     const [a, b] = await Promise.all([
-      supabase.from('profiles').update(profileUpdate).eq('id', profile.id),
+      supabase.from('profiles').update({ full_name: fullName.trim(), position }).eq('id', profile.id),
       supabase.rpc('set_my_interests', { p_category_ids: picked, p_other: other, p_goals: goals }),
     ])
     setBusy(false)
@@ -74,24 +70,14 @@ export default function Profile() {
           <span>Full name</span>
           <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
         </label>
-        {isPartner ? (
-          <div className="field">
-            <span>Position</span>
-            <p>
-              Shareholder <span className="small muted">(set by an admin; ask an admin to change it)</span>
-            </p>
-          </div>
-        ) : (
-          <label className="field">
-            <span>Position</span>
-            <select value={position} onChange={(e) => setPosition(e.target.value as MemberPosition)}>
-              {SELF_POSITIONS.map((v) => (
-                <option key={v} value={v}>{POSITION_LABELS[v]}</option>
-              ))}
-            </select>
-            <small>Shareholder status is set by an admin.</small>
-          </label>
-        )}
+        <label className="field">
+          <span>Position</span>
+          <select value={position} onChange={(e) => setPosition(e.target.value as MemberPosition)}>
+            {SELF_POSITIONS.map((v) => (
+              <option key={v} value={v}>{POSITION_LABELS[v]}</option>
+            ))}
+          </select>
+        </label>
         <p className="small muted">
           {profile.email} · {ROLE_LABELS[profile.role]}
         </p>

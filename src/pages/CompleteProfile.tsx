@@ -8,7 +8,6 @@ export default function CompleteProfile() {
   const profile = useProfile()
   const { refreshProfile, signOut } = useAuth()
   const [fullName, setFullName] = useState(profile.full_name)
-  const isPartner = profile.position === 'partner'
   const [position, setPosition] = useState<MemberPosition | ''>(profile.position ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +19,7 @@ export default function CompleteProfile() {
     setError(null)
     const { error: saveError } = await supabase
       .from('profiles')
-      .update(isPartner ? { full_name: fullName.trim() } : { full_name: fullName.trim(), position })
+      .update({ full_name: fullName.trim(), position })
       .eq('id', profile.id)
     setBusy(false)
     if (saveError) {
@@ -47,32 +46,19 @@ export default function CompleteProfile() {
             autoFocus
           />
         </label>
-        {isPartner ? (
-          <div className="field">
-            <span>Position</span>
-            <p>
-              Shareholder <span className="small muted">(set by an admin)</span>
-            </p>
-          </div>
-        ) : (
-          <label className="field">
-            <span>Position</span>
-            <select value={position} onChange={(e) => setPosition(e.target.value as MemberPosition)} required>
-              <option value="" disabled>
-                Choose one
+        <label className="field">
+          <span>Position</span>
+          <select value={position} onChange={(e) => setPosition(e.target.value as MemberPosition)} required>
+            <option value="" disabled>
+              Choose one
+            </option>
+            {SELF_POSITIONS.map((value) => (
+              <option key={value} value={value}>
+                {POSITION_LABELS[value]}
               </option>
-              {SELF_POSITIONS.map((value) => (
-                <option key={value} value={value}>
-                  {POSITION_LABELS[value]}
-                </option>
-              ))}
-            </select>
-            <small>
-              Shareholder is not listed because an admin sets it. Shareholders: choose Shareholder track for now and
-              an admin will update it.
-            </small>
-          </label>
-        )}
+            ))}
+          </select>
+        </label>
         <button className="btn btn-primary" disabled={busy || !fullName.trim() || !position}>
           {busy ? 'Saving…' : 'Continue'}
         </button>

@@ -62,14 +62,14 @@ update public.profiles set full_name = 'Dr. Doc', position = 'employed_physician
 select tests.eq((select position::text from public.profiles where id = auth.uid()), 'employed_physician', 'member picks own position');
 update public.profiles set position = 'partnership_track' where id = auth.uid();
 select tests.eq((select position::text from public.profiles where id = auth.uid()), 'partnership_track', 'member changes own position');
-select tests.expect_error($$update public.profiles set position = 'partner' where id = auth.uid()$$, 'Only an admin can set or remove the Partner%');
+update public.profiles set position = 'partner' where id = auth.uid();
+select tests.eq((select position::text from public.profiles where id = auth.uid()), 'partner', 'member can choose shareholder');
 select tests.expect_error($$update public.profiles set role = 'admin' where id = auth.uid()$$, 'permission denied%');
 update public.profiles set position = 'employed_physician' where id = auth.uid();
 reset role;
 
 set request.jwt.claim.sub = :'partner';
 set role authenticated;
-select tests.expect_error($$update public.profiles set position = 'employed_physician' where id = auth.uid()$$, 'Only an admin can set or remove the Partner%');
 update public.profiles set full_name = 'Pat Partner' where id = auth.uid();
 reset role;
 

@@ -70,9 +70,9 @@ export const POSITION_LABELS: Record<MemberPosition, string> = {
   admin_staff: 'Administrative staff',
 }
 
-// Positions members can choose for themselves. Shareholder is set by an admin.
+// Positions in the order people choose from.
 // (Internal names say "partner"; every label people see says "shareholder".)
-export const SELF_POSITIONS: MemberPosition[] = ['employed_physician', 'partnership_track', 'apc', 'admin_staff']
+export const SELF_POSITIONS: MemberPosition[] = ['employed_physician', 'partnership_track', 'partner', 'apc', 'admin_staff']
 
 export function isPhysician(position: MemberPosition | null): boolean {
   return position === 'employed_physician' || position === 'partnership_track' || position === 'partner'

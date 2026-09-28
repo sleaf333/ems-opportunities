@@ -300,7 +300,7 @@ function MemberRoles({
         <h2>Roles and shareholders</h2>
         <p className="small muted">
           Posters can post opportunities. Admins can do everything, including this page. Shareholders can commit to
-          shareholders-only opportunities; only admins can mark someone as a shareholder. If the person has not signed in
+          shareholders-only opportunities. Members choose their own position, and you can correct it here. If the person has not signed in
           yet, this is saved and applied the first time they do.
         </p>
       </div>

@@ -17,13 +17,13 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 | Role | Who | Can do |
 |---|---|---|
 | Member | Anyone with an @ems-wi.com email | Browse, express interest, commit, withdraw, edit own profile |
-| Shareholder | A position only an admin can assign | Can commit to shareholders-only committees |
+| Shareholder | A position members choose (admins can correct it) | Can commit to shareholders-only committees |
 | Poster | Members an admin has approved | Everything a member can, plus create and manage their own opportunities and mark attendance. Posts go live immediately; admins do not review them first. |
 | Admin | Project owner and anyone they appoint | Everything, plus manage roles, edit or close any post, see all engagement data, export data |
 
 **Access control:** only @ems-wi.com addresses can create an account. That domain includes only group members (physicians, APCs, admin staff), so no separate roster is needed. Each profile has a **position** field (Physician / APC / Staff) so reports can be filtered.
 
-**Positions:** Employed physician, Shareholder track, Shareholder, APC, Administrative staff. Members pick their own, except Shareholder, which only an admin can set or remove.
+**Positions:** Employed physician, Shareholder track, Shareholder, APC, Administrative staff. Members pick their own; admins can correct anyone's.
 
 **Who can commit:** each opportunity is open to all team members, physicians only (employed, shareholder track and shareholders), or shareholders only (matching the committee brochure). Anyone can mark themselves **Interested** in anything, so interest in, say, the Finance Committee from someone who is not yet a shareholder is still recorded.
 
@@ -56,8 +56,8 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 - [x] Every opportunity has its own link to paste into the newsletter; people who are not signed in land there after signing in
 
 ### Phase 1.5: Second round (built)
-- [x] Positions: Employed physician, Shareholder track, Shareholder (admin-set), APC, Administrative staff
-- [x] The separate shareholder checkbox became a Shareholder position that only admins can set
+- [x] Positions: Employed physician, Shareholder track, Shareholder, APC, Administrative staff
+- [x] The separate shareholder checkbox became a Shareholder position (self-selected since 0003; admins can correct it)
 - [x] Required location (Door County, Fox Valley, Milwaukee, Watertown, Group-wide), optional hospital/site, meeting format, and a location filter
 - [x] "Show on site until" date, separate from the activity dates: committees default to indefinitely, other posts to 180 days; expired posts leave the list but are never deleted; admins see posts ending soon and expired posts
 - [x] Nobody can delete an opportunity through the site; close or archive instead
@@ -167,3 +167,4 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-28 | Every post needs a location: Door County, Fox Valley, Milwaukee, Watertown or Group-wide; hospital/site optional |
 | 2026-09-28 | Interests come from one admin-managed topic list, shared with opportunity topics, plus an optional write-in |
 | 2026-09-28 | Use the company's own titles: "Shareholder track" and "Shareholder" (not "Partnership track" / "Partner"). Only labels changed; the database still stores them as partnership_track / partner |
+| 2026-09-28 | Members can choose Shareholder themselves (admin-only was confusing for real shareholders). Accepted risk: someone could mislabel themselves to join shareholders-only committees; admins see every commitment with names and positions and can correct it |
