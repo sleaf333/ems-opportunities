@@ -51,7 +51,7 @@ export default function CompleteProfile() {
           <div className="field">
             <span>Position</span>
             <p>
-              Partner <span className="small muted">(set by an admin)</span>
+              Shareholder <span className="small muted">(set by an admin)</span>
             </p>
           </div>
         ) : (
@@ -67,7 +67,7 @@ export default function CompleteProfile() {
                 </option>
               ))}
             </select>
-            <small>Partners: choose your closest match for now. An admin marks partners.</small>
+            <small>Shareholders: choose your closest match for now. An admin marks shareholders.</small>
           </label>
         )}
         <button className="btn btn-primary" disabled={busy || !fullName.trim() || !position}>

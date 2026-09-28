@@ -35,5 +35,6 @@ export function friendlyError(error: unknown): string {
   if (/row-level security|permission denied/i.test(message)) {
     return 'You do not have permission to do that.'
   }
-  return message
+  // The database calls shareholders "partners" internally.
+  return message.replace(/\bPartner\b/g, 'Shareholder').replace(/\bpartners\b/g, 'shareholders')
 }

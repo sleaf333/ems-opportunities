@@ -297,10 +297,10 @@ function MemberRoles({
   return (
     <form id="roles" className="card stack" onSubmit={save}>
       <div>
-        <h2>Roles and partners</h2>
+        <h2>Roles and shareholders</h2>
         <p className="small muted">
-          Posters can post opportunities. Admins can do everything, including this page. Partners can commit to
-          partners-only opportunities; only admins can mark someone as a partner. If the person has not signed in
+          Posters can post opportunities. Admins can do everything, including this page. Shareholders can commit to
+          shareholders-only opportunities; only admins can mark someone as a shareholder. If the person has not signed in
           yet, this is saved and applied the first time they do.
         </p>
       </div>
@@ -325,7 +325,7 @@ function MemberRoles({
         </label>
         <label className="check align-end">
           <input type="checkbox" checked={partner} onChange={(e) => setPartner(e.target.checked)} />
-          Partner
+          Shareholder
         </label>
       </div>
       <div>
@@ -342,7 +342,7 @@ function MemberRoles({
               <li key={p.email} className="row between wrap gap-sm">
                 <span>
                   {p.email} · {ROLE_LABELS[p.role]}
-                  {p.is_partner ? ' · Partner' : ''}
+                  {p.is_partner ? ' · Shareholder' : ''}
                 </span>
                 <span className="row gap-sm">
                   <button

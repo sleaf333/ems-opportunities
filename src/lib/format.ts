@@ -29,7 +29,7 @@ export const COMMITMENT_LABELS: Record<CommitmentLevel, string> = {
 export const AUDIENCE_LABELS: Record<OppAudience, string> = {
   all: 'All team members',
   physicians: 'Physicians',
-  partners: 'Partners',
+  partners: 'Shareholders',
 }
 
 export const REGION_LABELS: Record<OppRegion, string> = {
@@ -64,13 +64,14 @@ export const SIGNUP_LABELS: Record<SignupStatus, string> = {
 
 export const POSITION_LABELS: Record<MemberPosition, string> = {
   employed_physician: 'Employed physician',
-  partnership_track: 'Partnership track',
-  partner: 'Partner',
+  partnership_track: 'Shareholder track',
+  partner: 'Shareholder',
   apc: 'APC',
   admin_staff: 'Administrative staff',
 }
 
-// Positions members can choose for themselves. Partner is set by an admin.
+// Positions members can choose for themselves. Shareholder is set by an admin.
+// (Internal names say "partner"; every label people see says "shareholder".)
 export const SELF_POSITIONS: MemberPosition[] = ['employed_physician', 'partnership_track', 'apc', 'admin_staff']
 
 export function isPhysician(position: MemberPosition | null): boolean {

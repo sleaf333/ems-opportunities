@@ -15,7 +15,7 @@ export default function Privacy() {
         <h2>What is recorded</h2>
         <ul>
           <li>
-            Your name, work email and position (employed physician, partnership track, partner, APC or
+            Your name, work email and position (employed physician, shareholder track, shareholder, APC or
             administrative staff).
           </li>
           <li>Each time you mark yourself interested, commit, join a waitlist or withdraw, and when.</li>

@@ -39,7 +39,7 @@ import type {
 const SECTIONS: { audience: OppAudience; title: string; blurb: string }[] = [
   { audience: 'all', title: 'Open to everyone', blurb: 'Physicians, APCs and staff' },
   { audience: 'physicians', title: 'For physicians', blurb: 'Anyone can show interest' },
-  { audience: 'partners', title: 'For partners', blurb: 'Anyone can show interest' },
+  { audience: 'partners', title: 'For shareholders', blurb: 'Anyone can show interest' },
 ]
 
 const TYPE_PLURALS: Record<OppType, string> = {

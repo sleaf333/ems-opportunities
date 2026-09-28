@@ -78,7 +78,7 @@ export default function Profile() {
           <div className="field">
             <span>Position</span>
             <p>
-              Partner <span className="small muted">(set by an admin; ask an admin to change it)</span>
+              Shareholder <span className="small muted">(set by an admin; ask an admin to change it)</span>
             </p>
           </div>
         ) : (
@@ -89,7 +89,7 @@ export default function Profile() {
                 <option key={v} value={v}>{POSITION_LABELS[v]}</option>
               ))}
             </select>
-            <small>Partner status is set by an admin.</small>
+            <small>Shareholder status is set by an admin.</small>
           </label>
         )}
         <p className="small muted">
