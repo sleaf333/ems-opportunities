@@ -23,8 +23,9 @@ Keep a note of each value marked **Save this**. Never paste the Supabase **servi
 ### Create the tables and rules
 4. In the left menu, open **SQL Editor**, then **New query**.
 5. Open `supabase/migrations/0001_init.sql` from this repository, copy all of it, paste it in and click **Run**. It should say "Success. No rows returned."
-6. New query again: copy all of `supabase/seed.sql`, paste and **Run**. This loads the 15 committees from the brochure.
-7. New query again: make yourself the first admin. Replace the email with yours, then **Run**:
+6. New query: do the same with `supabase/migrations/0002_positions_locations_interests.sql`. Run every file in `supabase/migrations` once, in number order.
+7. New query again: copy all of `supabase/seed.sql`, paste and **Run**. This loads the topics and the 15 committees from the brochure.
+8. New query again: make yourself the first admin. Replace the email with yours, then **Run**:
 
    ```sql
    insert into public.member_presets (email, role)
@@ -37,9 +38,9 @@ Keep a note of each value marked **Save this**. Never paste the Supabase **servi
    Use lowercase. The first part applies when you first sign in; the second covers the case where you already have.
 
 ### Get the connection values
-8. Open **Project Settings** (gear icon), then **API** (it may be called **API Keys**).
-9. **Save this:** the **Project URL** (looks like `https://abcdefgh.supabase.co`).
-10. **Save this:** the **anon public** key, or the **publishable** key if that is what you see. Either works. It is safe for this key to be public.
+9. Open **Project Settings** (gear icon), then **API** (it may be called **API Keys**).
+10. **Save this:** the **Project URL** (looks like `https://abcdefgh.supabase.co`).
+11. **Save this:** the **anon public** key, or the **publishable** key if that is what you see. Either works. It is safe for this key to be public.
 
 ---
 
@@ -108,7 +109,7 @@ From now on, every change merged into `main` on GitHub redeploys the site automa
 
 - **Invite people in batches** (about 50 a day). The free email plan allows about 300 emails a day. People stay signed in on their own devices, so after launch day, sign-in emails are rare.
 - **Approve posters:** on the **Admin** page, enter someone's email, choose **Poster** and save. They do not need to have signed in yet.
-- **Mark shareholders** the same way (tick **Shareholder**), so they can commit to shareholder-only committees.
+- **Mark shareholders** the same way (tick **Shareholder**), so they can commit to shareholders-only committees. Only admins can make someone a shareholder.
 - **Share the link** in the newsletter.
 
 ## Monthly: back up the data
@@ -130,3 +131,13 @@ Nothing needs to be rebuilt to upgrade. These are monthly or yearly costs; none 
 | Brevo paid plan | Only if you add automatic digest emails to everyone | Varies |
 
 Check current prices before buying; they change.
+
+## Applying a database update
+
+When a change needs a new file in `supabase/migrations` (for example `0002_...sql`), it will say so in the pull request. To apply it:
+
+1. In Supabase, open **SQL Editor**, then **New query**.
+2. Paste the whole new file and click **Run**. Run each new file once, in number order. Never re-run an older one.
+3. Right after that, merge the pull request so Cloudflare publishes the matching website. The site may show errors for the minute or two in between.
+
+Download the four Admin exports first if there is data you would hate to lose.

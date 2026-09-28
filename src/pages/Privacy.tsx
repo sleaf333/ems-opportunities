@@ -14,10 +14,13 @@ export default function Privacy() {
 
         <h2>What is recorded</h2>
         <ul>
-          <li>Your name, work email and position (Physician, APC or Staff).</li>
+          <li>
+            Your name, work email and position (employed physician, shareholder track, shareholder, APC or
+            administrative staff).
+          </li>
           <li>Each time you mark yourself interested, commit, join a waitlist or withdraw, and when.</li>
           <li>Attendance or completion, if the organizer records it.</li>
-          <li>Interests and leadership goals, if you add them to your profile.</li>
+          <li>The interest topics you pick, anything else you write in, and leadership goals, if you add them.</li>
         </ul>
 
         <h2>What is not recorded</h2>
@@ -29,11 +32,12 @@ export default function Privacy() {
         <h2>Who sees what</h2>
         <ul>
           <li>
-            <strong>Everyone signed in</strong> sees who is interested in, committed to, waitlisted for or completed
-            each opportunity.
+            <strong>Everyone signed in</strong> sees how many people have signed up for each opportunity. They see
+            names only if the person who posted it chooses to show them.
           </li>
           <li>
-            <strong>The person who posted an opportunity</strong> also sees who withdrew from it.
+            <strong>The person who posted an opportunity</strong> sees who signed up for it, including anyone who
+            withdrew.
           </li>
           <li>
             <strong>Admins</strong> see everything, including the full history, interests and leadership goals, and can
@@ -44,7 +48,13 @@ export default function Privacy() {
         <h2>How it is used</h2>
         <p>
           To match people with opportunities, to understand engagement across the group, and to identify and support
-          people interested in leadership.
+          people interested in leadership. Admins may reach out to you about opportunities that match your interests.
+        </p>
+
+        <h2>How long it is kept</h2>
+        <p>
+          Opportunities and sign-up history are kept so the group can look back over time. Posts leave the site after
+          their end date but are not deleted.
         </p>
 
         <p className="small muted">Questions? Contact an admin.</p>

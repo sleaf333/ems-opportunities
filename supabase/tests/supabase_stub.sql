@@ -2,9 +2,14 @@
 -- migration can be tested on plain Postgres. Mirrors Supabase's default
 -- grants, which the migration is expected to tighten.
 
-create role anon nologin;
-create role authenticated nologin;
-create role service_role nologin bypassrls;
+-- Roles are shared by every database in the cluster, so create them once.
+do $$
+begin
+  create role anon nologin;
+  create role authenticated nologin;
+  create role service_role nologin bypassrls;
+exception when duplicate_object then null;
+end $$;
 
 create schema auth;
 create table auth.users (

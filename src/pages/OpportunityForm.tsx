@@ -1,10 +1,33 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
-import { fetchOpportunity } from '../lib/data'
-import { AUDIENCE_LABELS, COMMITMENT_LABELS, parseTags, STATUS_LABELS, TYPE_LABELS } from '../lib/format'
+import { categoriesByOpportunity, fetchCategories, fetchOpportunity, fetchOpportunityCategories } from '../lib/data'
+import {
+  addDays,
+  AUDIENCE_LABELS,
+  COMMITMENT_LABELS,
+  FORMAT_LABELS,
+  formatDate,
+  localToday,
+  REGION_LABELS,
+  STATUS_LABELS,
+  TYPE_LABELS,
+} from '../lib/format'
 import { friendlyError, supabase } from '../lib/supabase'
-import type { CommitmentLevel, Opportunity, OppAudience, OppStatus, OppType } from '../lib/types'
+import type {
+  CommitmentLevel,
+  InterestCategory,
+  Opportunity,
+  OppAudience,
+  OppFormat,
+  OppRegion,
+  OppStatus,
+  OppType,
+} from '../lib/types'
+
+// New posts stay up this long unless the poster picks another date.
+// Committees default to staying up indefinitely.
+const DEFAULT_POSTING_DAYS = 180
 
 interface FormState {
   title: string
@@ -13,33 +36,24 @@ interface FormState {
   commitment: CommitmentLevel
   time_estimate: string
   audience: OppAudience
+  region: OppRegion | ''
+  site: string
+  format: OppFormat
   capacity: string
   start_date: string
   end_date: string
   signup_deadline: string
+  indefinite: boolean
+  visible_until: string
   new_hire_friendly: boolean
-  tags: string
+  show_names: boolean
   contact_name: string
   contact_email: string
   status: OppStatus
 }
 
-const EMPTY: FormState = {
-  title: '',
-  type: 'committee',
-  description: '',
-  commitment: 'ongoing',
-  time_estimate: '',
-  audience: 'all',
-  capacity: '',
-  start_date: '',
-  end_date: '',
-  signup_deadline: '',
-  new_hire_friendly: false,
-  tags: '',
-  contact_name: '',
-  contact_email: '',
-  status: 'open',
+function defaultWindow(type: OppType): Pick<FormState, 'indefinite' | 'visible_until'> {
+  return { indefinite: type === 'committee', visible_until: addDays(localToday(), DEFAULT_POSTING_DAYS) }
 }
 
 function fromOpportunity(o: Opportunity): FormState {
@@ -50,12 +64,17 @@ function fromOpportunity(o: Opportunity): FormState {
     commitment: o.commitment,
     time_estimate: o.time_estimate,
     audience: o.audience,
+    region: o.region,
+    site: o.site,
+    format: o.format,
     capacity: o.capacity ? String(o.capacity) : '',
     start_date: o.start_date ?? '',
     end_date: o.end_date ?? '',
     signup_deadline: o.signup_deadline ?? '',
+    indefinite: o.visible_until === null,
+    visible_until: o.visible_until ?? addDays(localToday(), DEFAULT_POSTING_DAYS),
     new_hire_friendly: o.new_hire_friendly,
-    tags: o.tags.join(', '),
+    show_names: o.show_names,
     contact_name: o.contact_name,
     contact_email: o.contact_email,
     status: o.status,
@@ -68,24 +87,52 @@ export default function OpportunityForm() {
   const profile = useProfile()
   const navigate = useNavigate()
   const [form, setForm] = useState<FormState>(() => ({
-    ...EMPTY,
+    title: '',
+    type: 'committee',
+    description: '',
+    commitment: 'ongoing',
+    time_estimate: '',
+    audience: 'all',
+    region: '',
+    site: '',
+    format: 'in_person',
+    capacity: '',
+    start_date: '',
+    end_date: '',
+    signup_deadline: '',
+    ...defaultWindow('committee'),
+    new_hire_friendly: false,
+    show_names: false,
     contact_name: profile.full_name,
     contact_email: profile.email,
+    status: 'open',
   }))
+  const [windowTouched, setWindowTouched] = useState(false)
+  const [commitmentTouched, setCommitmentTouched] = useState(false)
+  const [categories, setCategories] = useState<InterestCategory[]>([])
+  const [picked, setPicked] = useState<string[]>([])
   const [original, setOriginal] = useState<Opportunity | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!id) return
-    fetchOpportunity(id)
-      .then((opp) => {
-        if (!opp) setLoadError('This opportunity does not exist.')
-        else {
-          setOriginal(opp)
-          setForm(fromOpportunity(opp))
+    if (!id) {
+      fetchCategories()
+        .then(setCategories)
+        .catch((err: Error) => setLoadError(err.message))
+      return
+    }
+    Promise.all([fetchOpportunity(id), fetchCategories(), fetchOpportunityCategories()])
+      .then(([opp, cats, links]) => {
+        if (!opp) {
+          setLoadError('This opportunity does not exist.')
+          return
         }
+        setOriginal(opp)
+        setCategories(cats)
+        setForm(fromOpportunity(opp))
+        setPicked((categoriesByOpportunity(links, cats).get(id) ?? []).map((c) => c.id))
       })
       .catch((err: Error) => setLoadError(err.message))
   }, [id])
@@ -109,11 +156,37 @@ export default function OpportunityForm() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  function changeType(type: OppType) {
+    // On a new post, keep sensible defaults matched to the type until the
+    // poster changes them: committees are ongoing and stay up indefinitely;
+    // events are one-time and stay up 180 days.
+    setForm((prev) => ({
+      ...prev,
+      type,
+      ...(!editing && !windowTouched ? defaultWindow(type) : {}),
+      ...(!editing && !commitmentTouched
+        ? { commitment: type === 'committee' ? 'ongoing' : type === 'event' ? 'one_time' : prev.commitment }
+        : {}),
+    }))
+  }
+
+  function togglePicked(categoryId: string) {
+    setPicked((prev) => (prev.includes(categoryId) ? prev.filter((c) => c !== categoryId) : [...prev, categoryId]))
+  }
+
   async function save(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    if (!form.region) {
+      setError('Please choose a location.')
+      return
+    }
     if (form.start_date && form.end_date && form.end_date < form.start_date) {
       setError('The end date is before the start date.')
+      return
+    }
+    if (!form.indefinite && !form.visible_until) {
+      setError('Pick a "Show on site until" date, or choose "Keep posted indefinitely".')
       return
     }
     const capacity = form.capacity.trim() ? Number(form.capacity) : null
@@ -128,12 +201,16 @@ export default function OpportunityForm() {
       commitment: form.commitment,
       time_estimate: form.time_estimate.trim(),
       audience: form.audience,
+      region: form.region,
+      site: form.site.trim(),
+      format: form.format,
       capacity,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       signup_deadline: form.signup_deadline || null,
+      visible_until: form.indefinite ? null : form.visible_until,
       new_hire_friendly: form.new_hire_friendly,
-      tags: parseTags(form.tags),
+      show_names: form.show_names,
       contact_name: form.contact_name.trim(),
       contact_email: form.contact_email.trim(),
       status: form.status,
@@ -142,27 +219,30 @@ export default function OpportunityForm() {
     const result = editing
       ? await supabase.from('opportunities').update(values).eq('id', id!).select('id').single()
       : await supabase.from('opportunities').insert(values).select('id').single()
-    setBusy(false)
     if (result.error) {
+      setBusy(false)
       setError(friendlyError(result.error))
       return
     }
-    navigate(`/o/${result.data.id}`)
+    const savedId = result.data.id as string
+    const topics = await supabase.rpc('set_opportunity_categories', {
+      p_opportunity_id: savedId,
+      p_category_ids: picked,
+    })
+    setBusy(false)
+    if (topics.error) {
+      setError(`Saved, but the topics could not be updated: ${friendlyError(topics.error)}`)
+      return
+    }
+    navigate(`/o/${savedId}`)
   }
 
-  async function remove() {
-    if (!id) return
-    if (!window.confirm('Delete this opportunity and all of its sign-up history? This cannot be undone. Closing or archiving keeps the history.')) return
-    setBusy(true)
-    const { error: deleteError } = await supabase.from('opportunities').delete().eq('id', id)
-    setBusy(false)
-    if (deleteError) setError(friendlyError(deleteError))
-    else navigate('/')
-  }
+  // Retired categories stay visible only if this post already uses them.
+  const choosable = categories.filter((c) => c.active || picked.includes(c.id))
 
   return (
     <form className="stack-lg narrow" onSubmit={save}>
-      <div>
+      <div className="stack-sm">
         <Link to={editing ? `/o/${id}` : '/'} className="small">← Back</Link>
         <h1>{editing ? 'Edit opportunity' : 'Post an opportunity'}</h1>
       </div>
@@ -179,7 +259,7 @@ export default function OpportunityForm() {
         <div className="grid-2">
           <label className="field">
             <span>Type</span>
-            <select value={form.type} onChange={(e) => set('type', e.target.value as OppType)}>
+            <select value={form.type} onChange={(e) => changeType(e.target.value as OppType)}>
               {Object.entries(TYPE_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
@@ -207,11 +287,56 @@ export default function OpportunityForm() {
       </section>
 
       <section className="card stack">
-        <h2>Time and spots</h2>
+        <h2>Where</h2>
+        <div className="grid-2">
+          <label className="field">
+            <span>
+              Location <span className="required">(required)</span>
+            </span>
+            <select value={form.region} onChange={(e) => set('region', e.target.value as OppRegion)} required>
+              <option value="" disabled>
+                Choose a location
+              </option>
+              {Object.entries(REGION_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+            <small>Pick the location that owns this, even if it meets virtually.</small>
+          </label>
+          <label className="field">
+            <span>Format</span>
+            <select value={form.format} onChange={(e) => set('format', e.target.value as OppFormat)}>
+              {Object.entries(FORMAT_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="field">
+          <span>
+            Specific hospital or site <span className="optional">(optional, you can leave this blank)</span>
+          </span>
+          <input
+            value={form.site}
+            onChange={(e) => set('site', e.target.value)}
+            placeholder="e.g. Ascension St. Elizabeth"
+            maxLength={120}
+          />
+        </label>
+      </section>
+
+      <section className="card stack">
+        <h2>When</h2>
         <div className="grid-2">
           <label className="field">
             <span>Time commitment</span>
-            <select value={form.commitment} onChange={(e) => set('commitment', e.target.value as CommitmentLevel)}>
+            <select
+              value={form.commitment}
+              onChange={(e) => {
+                setCommitmentTouched(true)
+                set('commitment', e.target.value as CommitmentLevel)
+              }}
+            >
               {Object.entries(COMMITMENT_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
@@ -251,6 +376,71 @@ export default function OpportunityForm() {
             <small>When full, new commitments go on a waitlist.</small>
           </label>
         </div>
+      </section>
+
+      <section className="card stack">
+        <div>
+          <h2>How long it stays on the site</h2>
+          <p className="small muted">
+            This is separate from the dates above. When this date passes, the post leaves the list, but it is never
+            deleted. You can change the date later to put it back up.
+          </p>
+        </div>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={form.indefinite}
+            onChange={(e) => {
+              setWindowTouched(true)
+              set('indefinite', e.target.checked)
+            }}
+          />
+          Keep posted indefinitely
+        </label>
+        {!form.indefinite && (
+          <label className="field field-narrow">
+            <span>Show on site until</span>
+            <input
+              type="date"
+              value={form.visible_until}
+              min={editing ? undefined : localToday()}
+              onChange={(e) => {
+                setWindowTouched(true)
+                set('visible_until', e.target.value)
+              }}
+              required
+            />
+            <small>
+              {form.visible_until ? `Stays up through ${formatDate(form.visible_until)}.` : ''} New posts default to{' '}
+              {DEFAULT_POSTING_DAYS} days; committees default to indefinitely.
+            </small>
+          </label>
+        )}
+      </section>
+
+      <section className="card stack">
+        <h2>Topics and sign-ups</h2>
+        <div className="field">
+          <span>Topics</span>
+          {choosable.length === 0 ? (
+            <small>No topics yet. An admin can add them on the Admin page.</small>
+          ) : (
+            <div className="chips">
+              {choosable.map((c) => (
+                <button
+                  type="button"
+                  key={c.id}
+                  className={`chip ${picked.includes(c.id) ? 'chip-on' : ''}`}
+                  aria-pressed={picked.includes(c.id)}
+                  onClick={() => togglePicked(c.id)}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <small>Members who picked these topics as interests are the people most likely to join.</small>
+        </div>
         <label className="check">
           <input
             type="checkbox"
@@ -259,10 +449,19 @@ export default function OpportunityForm() {
           />
           Good for new hires
         </label>
+        <label className="check check-top">
+          <input type="checkbox" checked={form.show_names} onChange={(e) => set('show_names', e.target.checked)} />
+          <span>
+            Show names of who signed up to all members
+            <small className="block muted">
+              Off by default: members see only how many have signed up. You and admins always see the names.
+            </small>
+          </span>
+        </label>
       </section>
 
       <section className="card stack">
-        <h2>Contact and topics</h2>
+        <h2>Contact and status</h2>
         <div className="grid-2">
           <label className="field">
             <span>Contact name</span>
@@ -274,31 +473,25 @@ export default function OpportunityForm() {
           </label>
         </div>
         <label className="field">
-          <span>Topics (optional, separated by commas)</span>
-          <input value={form.tags} onChange={(e) => set('tags', e.target.value)} placeholder="education, wellness" />
-        </label>
-        <label className="field">
           <span>Status</span>
           <select value={form.status} onChange={(e) => set('status', e.target.value as OppStatus)}>
             {Object.entries(STATUS_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
-          <small>Draft: only you and admins see it. Closed: visible, no new sign-ups. Archived: hidden from the list.</small>
+          <small>
+            Draft: only you and admins see it. Closed: visible, no new sign-ups. Archived: hidden from the list.
+            Posts are never deleted, so their history stays available.
+          </small>
         </label>
       </section>
 
       {error && <p className="error" role="alert">{error}</p>}
 
-      <div className="row between wrap gap-sm">
+      <div>
         <button className="btn btn-primary" disabled={busy}>
           {busy ? 'Saving…' : editing ? 'Save changes' : 'Post'}
         </button>
-        {editing && profile.role === 'admin' && (
-          <button type="button" className="btn btn-link danger" onClick={() => void remove()} disabled={busy}>
-            Delete
-          </button>
-        )}
       </div>
     </form>
   )

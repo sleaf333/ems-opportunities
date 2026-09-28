@@ -19,24 +19,25 @@ import {
 } from 'lucide-react'
 import type { Opportunity } from '../lib/types'
 
-// First matching topic decides the icon; otherwise fall back to the type.
-const BY_TAG: Record<string, LucideIcon> = {
-  'peer support': HeartHandshake,
-  wellness: Leaf,
-  education: GraduationCap,
-  research: FlaskConical,
-  recruitment: UserPlus,
-  'disaster preparedness': Siren,
-  mentorship: Users,
-  ultrasound: Activity,
-  trauma: Ambulance,
-  prehospital: Ambulance,
-  quality: ClipboardCheck,
-  operations: FileSearch,
-  finance: Landmark,
-  leadership: Compass,
-  events: CalendarDays,
-}
+// Topic icons, most specific first: the first topic on this list that the
+// opportunity has decides its icon. Otherwise the type decides.
+const BY_TOPIC: [string, LucideIcon][] = [
+  ['peer support', HeartHandshake],
+  ['wellness', Leaf],
+  ['trauma', Ambulance],
+  ['ultrasound', Activity],
+  ['prehospital', Ambulance],
+  ['disaster preparedness', Siren],
+  ['research', FlaskConical],
+  ['recruitment', UserPlus],
+  ['mentorship', Users],
+  ['finance', Landmark],
+  ['education', GraduationCap],
+  ['operations', FileSearch],
+  ['leadership', Compass],
+  ['quality', ClipboardCheck],
+  ['events', CalendarDays],
+]
 
 const BY_TYPE: Record<Opportunity['type'], LucideIcon> = {
   committee: Users,
@@ -46,15 +47,21 @@ const BY_TYPE: Record<Opportunity['type'], LucideIcon> = {
   other: Sparkles,
 }
 
-export function iconFor(opp: Pick<Opportunity, 'tags' | 'type'>): LucideIcon {
-  for (const tag of opp.tags) {
-    const icon = BY_TAG[tag.toLowerCase()]
-    if (icon) return icon
-  }
-  return BY_TYPE[opp.type]
+export function iconFor(type: Opportunity['type'], topics: string[]): LucideIcon {
+  const have = new Set(topics.map((t) => t.toLowerCase()))
+  for (const [topic, icon] of BY_TOPIC) if (have.has(topic)) return icon
+  return BY_TYPE[type]
 }
 
-export default function OppIcon({ opp, size = 22 }: { opp: Pick<Opportunity, 'tags' | 'type'>; size?: number }) {
-  const Icon = iconFor(opp)
+export default function OppIcon({
+  type,
+  topics,
+  size = 22,
+}: {
+  type: Opportunity['type']
+  topics: string[]
+  size?: number
+}) {
+  const Icon = iconFor(type, topics)
   return <Icon size={size} strokeWidth={1.75} aria-hidden="true" />
 }

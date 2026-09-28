@@ -1,19 +1,46 @@
 import { useState, type ReactNode } from 'react'
-import { ArrowLeft, CalendarClock, CalendarDays, Clock, Mail, Pencil, Sprout, Ticket, Users } from 'lucide-react'
+import {
+  ArrowLeft,
+  CalendarClock,
+  CalendarDays,
+  Clock,
+  EyeOff,
+  Hourglass,
+  Mail,
+  MapPin,
+  Monitor,
+  Pencil,
+  Sprout,
+  Ticket,
+  Users,
+} from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
 import { Avatar } from '../components/Avatars'
 import { SignupBadge } from '../components/Badges'
 import OppIcon from '../components/OppIcon'
 import Description from '../components/Description'
-import { byId, fetchOpportunity, fetchProfiles, fetchSignupsFor, useLoader } from '../lib/data'
+import {
+  byId,
+  categoriesByOpportunity,
+  fetchCategories,
+  fetchCounts,
+  fetchOpportunity,
+  fetchOpportunityCategories,
+  fetchProfiles,
+  fetchSignupsFor,
+  useLoader,
+} from '../lib/data'
 import {
   AUDIENCE_LABELS,
   canCommit,
   COMMITMENT_LABELS,
   deadlinePassed,
   displayName,
+  FORMAT_LABELS,
   formatDate,
+  isExpired,
+  locationText,
   POSITION_LABELS,
   STATUS_LABELS,
   TYPE_LABELS,
@@ -24,10 +51,18 @@ import type { Profile, Signup, SignupStatus } from '../lib/types'
 export default function OpportunityDetail() {
   const { id = '' } = useParams()
   const profile = useProfile()
-  const { data, error, loading, reload } = useLoader(
-    () => Promise.all([fetchOpportunity(id), fetchSignupsFor(id), fetchProfiles()]),
-    [id],
-  )
+  const { data, error, loading, reload } = useLoader(async () => {
+    const [opp, signups, profiles, counts, categories, links] = await Promise.all([
+      fetchOpportunity(id),
+      fetchSignupsFor(id), // only rows this person may see
+      fetchProfiles(),
+      fetchCounts(),
+      fetchCategories(),
+      fetchOpportunityCategories(),
+    ])
+    const topics = categoriesByOpportunity(links, categories).get(id) ?? []
+    return [opp, signups, profiles, counts.get(id), topics] as const
+  }, [id])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -36,7 +71,7 @@ export default function OpportunityDetail() {
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
-  const [opp, signups, profiles] = data
+  const [opp, signups, profiles, counts, topics] = data
   if (!opp) {
     return (
       <div className="card">
@@ -50,10 +85,14 @@ export default function OpportunityDetail() {
   const people = byId(profiles)
   const mine = signups.find((s) => s.user_id === profile.id)
   const current = mine?.status
-  const isOpen = opp.status === 'open' && !deadlinePassed(opp)
+  const expired = isExpired(opp)
+  const isOpen = opp.status === 'open' && !deadlinePassed(opp) && !expired
   const eligible = canCommit(opp, profile)
-  const canEdit = profile.role === 'admin' || (profile.role === 'poster' && opp.created_by === profile.id)
-  const committedCount = signups.filter((s) => s.status === 'committed').length
+  const isOwner = opp.created_by === profile.id
+  const canEdit = profile.role === 'admin' || (profile.role === 'poster' && isOwner)
+  // Names: admins and the poster always; everyone else only if the poster allows it.
+  const namesVisible = profile.role === 'admin' || isOwner || opp.show_names
+  const committedCount = counts?.committed ?? 0
   const full = opp.capacity !== null && committedCount >= opp.capacity
 
   async function change(status: SignupStatus) {
@@ -79,6 +118,8 @@ export default function OpportunityDetail() {
   const group = (statuses: SignupStatus[]) => signups.filter((s) => statuses.includes(s.status))
 
   const facts: { icon: typeof Clock; label: string; value: ReactNode }[] = []
+  facts.push({ icon: MapPin, label: 'Location', value: locationText(opp) })
+  facts.push({ icon: Monitor, label: 'Format', value: FORMAT_LABELS[opp.format] })
   facts.push({ icon: Users, label: 'Who can commit', value: AUDIENCE_LABELS[opp.audience] })
   facts.push({ icon: Clock, label: 'Time', value: opp.time_estimate || COMMITMENT_LABELS[opp.commitment] })
   if (opp.start_date || opp.end_date) {
@@ -91,6 +132,11 @@ export default function OpportunityDetail() {
     })
   }
   if (opp.signup_deadline) facts.push({ icon: CalendarClock, label: 'Sign up by', value: formatDate(opp.signup_deadline) })
+  facts.push({
+    icon: Hourglass,
+    label: 'Posted until',
+    value: opp.visible_until ? formatDate(opp.visible_until) : 'Indefinitely',
+  })
   facts.push({
     icon: Ticket,
     label: 'Spots',
@@ -122,13 +168,14 @@ export default function OpportunityDetail() {
 
       <header className={`detail-hero opp-${opp.audience}`}>
         <span className="detail-icon">
-          <OppIcon opp={opp} size={30} />
+          <OppIcon type={opp.type} topics={topics.map((t) => t.name)} size={30} />
         </span>
         <div className="detail-heading">
           <p className="eyebrow">
             {TYPE_LABELS[opp.type]}
             {opp.audience !== 'all' ? ` · ${AUDIENCE_LABELS[opp.audience]} only` : ''}
             {opp.status !== 'open' ? ` · ${STATUS_LABELS[opp.status]}` : ''}
+            {expired ? ' · Expired' : ''}
           </p>
           <h1>{opp.title}</h1>
           {opp.new_hire_friendly && (
@@ -144,6 +191,13 @@ export default function OpportunityDetail() {
         )}
       </header>
 
+      {expired && (
+        <p className="warning">
+          This post is no longer shown on the site (it was posted until {formatDate(opp.visible_until)}).
+          {canEdit ? ' Change the "Show on site until" date to put it back up.' : ''}
+        </p>
+      )}
+
       <div className="detail">
         <article className="panel stack">
           <h2 className="panel-title">About</h2>
@@ -157,10 +211,10 @@ export default function OpportunityDetail() {
               </li>
             ))}
           </ul>
-          {opp.tags.length > 0 && (
+          {topics.length > 0 && (
             <div className="tags">
-              {opp.tags.map((t) => (
-                <span key={t} className="tag">{t}</span>
+              {topics.map((t) => (
+                <span key={t.id} className="tag">{t.name}</span>
               ))}
             </div>
           )}
@@ -213,7 +267,11 @@ export default function OpportunityDetail() {
                 )}
                 {!isOpen && (
                   <p className="small muted">
-                    {opp.status === 'open' ? 'The sign-up deadline has passed.' : 'This opportunity is not taking sign-ups.'}
+                    {opp.status !== 'open'
+                      ? 'This opportunity is not taking sign-ups.'
+                      : expired
+                        ? 'This post has expired.'
+                        : 'The sign-up deadline has passed.'}
                   </p>
                 )}
               </div>
@@ -224,11 +282,41 @@ export default function OpportunityDetail() {
 
           <section className="panel stack">
             <h2 className="panel-title">Who's in</h2>
-            <PeopleList title="Committed" rows={group(['committed', 'completed'])} people={people} />
-            <PeopleList title="Waitlist" rows={group(['waitlisted'])} people={people} ordered />
-            <PeopleList title="Interested" rows={group(['interested'])} people={people} />
-            {canEdit && (
-              <PeopleList title="Withdrawn (only posters and admins see this)" rows={group(['withdrawn', 'no_show'])} people={people} />
+            {namesVisible ? (
+              <>
+                <PeopleList title="Committed" rows={group(['committed', 'completed'])} people={people} />
+                <PeopleList title="Waitlist" rows={group(['waitlisted'])} people={people} ordered />
+                <PeopleList title="Interested" rows={group(['interested'])} people={people} />
+                {(canEdit || isOwner) && (
+                  <PeopleList title="Withdrawn" rows={group(['withdrawn', 'no_show'])} people={people} />
+                )}
+                {(profile.role === 'admin' || isOwner) && (
+                  <p className="small muted">
+                    {opp.show_names
+                      ? 'Everyone signed in can see these names.'
+                      : 'Only you, the poster and admins can see these names.'}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="count-row">
+                  <span>
+                    <strong>{counts?.committed ?? 0}</strong> committed
+                  </span>
+                  <span>
+                    <strong>{counts?.interested ?? 0}</strong> interested
+                  </span>
+                  {(counts?.waitlisted ?? 0) > 0 && (
+                    <span>
+                      <strong>{counts?.waitlisted}</strong> waitlisted
+                    </span>
+                  )}
+                </div>
+                <p className="small muted names-hidden">
+                  <EyeOff size={14} aria-hidden="true" /> Names are visible to the organizer and admins.
+                </p>
+              </>
             )}
           </section>
         </aside>
