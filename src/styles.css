@@ -905,15 +905,21 @@ input[type='checkbox'] {
   grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
 }
 
-/* Each audience gets its own accent. */
-.opp-all {
+/* Each "who can sign up" group gets its own accent. */
+.opp-everyone,
+.opp-clinical,
+.opp-custom {
   --accent: var(--brand);
 }
-.opp-physicians {
+.opp-physicians,
+.opp-track {
   --accent: var(--brand-2);
 }
 .opp-shareholders {
   --accent: var(--brand-3);
+}
+.opp-admin_staff {
+  --accent: var(--dot-4);
 }
 
 .opp {
@@ -1418,4 +1424,15 @@ tr.expanded td {
 }
 .card h3 {
   margin-bottom: 0.4rem;
+}
+
+/* Eligibility (0004) */
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+}
+.flag-view {
+  background: var(--surface-2);
+  color: var(--muted);
 }

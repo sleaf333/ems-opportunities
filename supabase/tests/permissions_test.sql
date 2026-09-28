@@ -293,31 +293,67 @@ select tests.expect_error(format($$select public.set_my_signup(%L, 'committed')$
 reset role;
 
 -- ---------------------------------------------------------------------------
--- Who can commit to what
+-- Who can sign up for what
 -- ---------------------------------------------------------------------------
 
+\set staffer 'a0000000-0000-0000-0000-000000000008'
+insert into auth.users (id, email) values (:'staffer', 'staffer@ems-wi.com');
+update public.profiles set full_name = 'Office Staff', position = 'admin_staff' where id = :'staffer';
+
+insert into public.opportunities (title, region, eligible_positions)
+values
+  ('Shareholder track retreat', 'fox_valley', '{partnership_track,partner}'),
+  ('Front office project', 'watertown', '{admin_staff}');
+select id as track_id from public.opportunities where title = 'Shareholder track retreat' \gset
+select id as office_id from public.opportunities where title = 'Front office project' \gset
+select id as wellness_opp_id from public.opportunities where title = 'Wellness Committee' \gset
+
+select tests.expect_error($$insert into public.opportunities (title, region, eligible_positions) values ('Nobody', 'milwaukee', '{}')$$, '%violates check constraint%');
+select tests.eq((select array_to_string(eligible_positions, ',') from public.opportunities where title = 'Wellness Committee'), 'employed_physician,partnership_track,partner,apc,admin_staff', 'everyone committees open to all five');
+select tests.eq((select array_to_string(eligible_positions, ',') from public.opportunities where title = 'Finance Committee'), 'partner', 'shareholder committees open to shareholders');
+
+-- Not eligible: view only (no interest, no commitment).
 set request.jwt.claim.sub = :'apc';
 set role authenticated;
-select tests.expect_error(format($$select public.set_my_signup(%L, 'committed')$$, :'trauma_id'), 'This opportunity is open to physicians only%');
-select tests.eq(public.set_my_signup(:'trauma_id', 'interested')::text, 'interested', 'anyone can show interest');
-reset role;
-
-set request.jwt.claim.sub = :'poster';
-set role authenticated;
-select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'partnership track counts as physician');
+select tests.eq((select count(*)::text from public.opportunities where id = :'finance_id'), '1', 'ineligible can still view');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'committed')$$, :'trauma_id'), 'This opportunity is not open to your position%');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'trauma_id'), 'This opportunity is not open to your position%');
 reset role;
 
 set request.jwt.claim.sub = :'doc';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'employed physician counts as physician');
-select tests.expect_error(format($$select public.set_my_signup(%L, 'committed')$$, :'finance_id'), 'This opportunity is open to partners only%');
-select tests.eq(public.set_my_signup(:'finance_id', 'interested')::text, 'interested', 'non-partner can show interest');
+select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'employed physician joins physician committee');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'finance_id'), 'This opportunity is not open to your position%');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'track_id'), 'This opportunity is not open to your position%');
+reset role;
+
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'shareholder track joins physician committee');
+select tests.eq(public.set_my_signup(:'track_id', 'committed')::text, 'committed', 'shareholder track joins track post');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'finance_id'), 'This opportunity is not open to your position%');
 reset role;
 
 set request.jwt.claim.sub = :'partner';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'finance_id', 'committed')::text, 'committed', 'partner commits to partners-only');
-select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'partner counts as physician');
+select tests.eq(public.set_my_signup(:'finance_id', 'committed')::text, 'committed', 'shareholder joins shareholder committee');
+select tests.eq(public.set_my_signup(:'track_id', 'interested')::text, 'interested', 'shareholder joins track post');
+select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'shareholder counts as physician');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'office_id'), 'This opportunity is not open to your position%');
+reset role;
+
+set request.jwt.claim.sub = :'staffer';
+set role authenticated;
+select tests.eq(public.set_my_signup(:'office_id', 'committed')::text, 'committed', 'administrative staff join admin-office post');
+select tests.eq(public.set_my_signup(:'wellness_opp_id', 'interested')::text, 'interested', 'administrative staff join everyone committees');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'trauma_id'), 'This opportunity is not open to your position%');
+reset role;
+
+-- Changing position does not trap anyone: they can still withdraw.
+update public.profiles set position = 'employed_physician' where id = :'partner';
+set request.jwt.claim.sub = :'partner';
+set role authenticated;
+select tests.eq(public.set_my_signup(:'finance_id', 'withdrawn')::text, 'withdrawn', 'ineligible can still withdraw');
 reset role;
 
 \o

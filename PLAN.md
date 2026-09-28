@@ -25,7 +25,7 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 
 **Positions:** Employed physician, Shareholder track, Shareholder, APC, Administrative staff. Members pick their own; admins can correct anyone's.
 
-**Who can commit:** each opportunity is open to all team members, physicians only (employed, shareholder track and shareholders), or shareholders only (matching the committee brochure). Anyone can mark themselves **Interested** in anything, so interest in, say, the Finance Committee from someone who is not yet a shareholder is still recorded.
+**Who can sign up:** each post lists exactly which positions can sign up, with presets: Everyone, Physicians and APCs, Physicians, Shareholder track and shareholders, Shareholders, Administrative staff. Everyone can **view** every post (for future reference), but only listed positions can mark Interested or Commit. Administrative staff sign up only for administrative-staff posts and posts open to everyone. The brochure's "All Team Members" committees are open to everyone, physician committees to the three physician positions, and shareholder committees to shareholders.
 
 **Who sees names:** admins and the person who posted an opportunity always see who signed up. Other members see only counts, unless the poster turns on "Show names to members" for that post.
 
@@ -168,3 +168,6 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-28 | Interests come from one admin-managed topic list, shared with opportunity topics, plus an optional write-in |
 | 2026-09-28 | Use the company's own titles: "Shareholder track" and "Shareholder" (not "Partnership track" / "Partner"). Only labels changed; the database still stores them as partnership_track / partner |
 | 2026-09-28 | Members can choose Shareholder themselves (admin-only was confusing for real shareholders). Accepted risk: someone could mislabel themselves to join shareholders-only committees; admins see every commitment with names and positions and can correct it |
+| 2026-09-28 | Who can sign up is a per-post list of positions (replaces everyone / physicians / shareholders). Ineligible people can view but not mark Interested or Commit |
+| 2026-09-28 | Shareholder-track posts are open to shareholder track and shareholders; employed physicians cannot join shareholder or shareholder-track posts |
+| 2026-09-28 | Administrative staff join only administrative-staff posts and posts open to everyone; the brochure's "All Team Members" committees are open to everyone, including administrative staff |

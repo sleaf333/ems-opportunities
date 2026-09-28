@@ -2,7 +2,6 @@ import type {
   CommitmentLevel,
   MemberPosition,
   Opportunity,
-  OppAudience,
   OppFormat,
   OppRegion,
   OppStatus,
@@ -24,12 +23,6 @@ export const COMMITMENT_LABELS: Record<CommitmentLevel, string> = {
   one_time: 'One-time',
   short_term: 'Short-term',
   ongoing: 'Ongoing',
-}
-
-export const AUDIENCE_LABELS: Record<OppAudience, string> = {
-  all: 'All team members',
-  physicians: 'Physicians',
-  partners: 'Shareholders',
 }
 
 export const REGION_LABELS: Record<OppRegion, string> = {
@@ -74,9 +67,6 @@ export const POSITION_LABELS: Record<MemberPosition, string> = {
 // (Internal names say "partner"; every label people see says "shareholder".)
 export const SELF_POSITIONS: MemberPosition[] = ['employed_physician', 'partnership_track', 'partner', 'apc', 'admin_staff']
 
-export function isPhysician(position: MemberPosition | null): boolean {
-  return position === 'employed_physician' || position === 'partnership_track' || position === 'partner'
-}
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   member: 'Member',
@@ -120,10 +110,54 @@ export function deadlinePassed(opp: Opportunity): boolean {
   return Boolean(opp.signup_deadline && opp.signup_deadline < localToday())
 }
 
-export function canCommit(opp: Opportunity, profile: Profile): boolean {
-  if (opp.audience === 'physicians') return isPhysician(profile.position)
-  if (opp.audience === 'partners') return profile.position === 'partner'
-  return true
+// Only the positions a post lists may sign up (interest or commit);
+// everyone can still view it.
+export function canSignUp(opp: Opportunity, profile: Profile): boolean {
+  return profile.position !== null && opp.eligible_positions.includes(profile.position)
+}
+
+export const ALL_POSITIONS: MemberPosition[] = ['employed_physician', 'partnership_track', 'partner', 'apc', 'admin_staff']
+
+// Common "who can sign up" choices, in the order they appear as sections on
+// the main page. Anything else is shown as a custom list.
+export const ELIGIBILITY_GROUPS: { key: string; title: string; label: string; positions: MemberPosition[] }[] = [
+  { key: 'everyone', title: 'Open to everyone', label: 'Everyone', positions: ALL_POSITIONS },
+  {
+    key: 'clinical',
+    title: 'Physicians and APCs',
+    label: 'Physicians and APCs',
+    positions: ['employed_physician', 'partnership_track', 'partner', 'apc'],
+  },
+  {
+    key: 'physicians',
+    title: 'For physicians',
+    label: 'Physicians',
+    positions: ['employed_physician', 'partnership_track', 'partner'],
+  },
+  {
+    key: 'track',
+    title: 'Shareholder track and shareholders',
+    label: 'Shareholder track and shareholders',
+    positions: ['partnership_track', 'partner'],
+  },
+  { key: 'shareholders', title: 'For shareholders', label: 'Shareholders', positions: ['partner'] },
+  { key: 'admin_staff', title: 'Administrative staff', label: 'Administrative staff', positions: ['admin_staff'] },
+]
+
+function samePositions(a: MemberPosition[], b: MemberPosition[]): boolean {
+  return a.length === b.length && a.every((p) => b.includes(p))
+}
+
+export function eligibilityGroup(positions: MemberPosition[]): string {
+  return ELIGIBILITY_GROUPS.find((g) => samePositions(g.positions, positions))?.key ?? 'custom'
+}
+
+export function eligibilityLabel(positions: MemberPosition[]): string {
+  const group = ELIGIBILITY_GROUPS.find((g) => samePositions(g.positions, positions))
+  if (group) return group.label
+  return ALL_POSITIONS.filter((p) => positions.includes(p))
+    .map((p) => POSITION_LABELS[p])
+    .join(', ')
 }
 
 // Past its "show on site until" date. Kept in the database, hidden from the list.

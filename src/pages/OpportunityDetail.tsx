@@ -32,11 +32,12 @@ import {
   useLoader,
 } from '../lib/data'
 import {
-  AUDIENCE_LABELS,
-  canCommit,
+  canSignUp,
   COMMITMENT_LABELS,
   deadlinePassed,
   displayName,
+  eligibilityGroup,
+  eligibilityLabel,
   FORMAT_LABELS,
   formatDate,
   isExpired,
@@ -86,8 +87,11 @@ export default function OpportunityDetail() {
   const mine = signups.find((s) => s.user_id === profile.id)
   const current = mine?.status
   const expired = isExpired(opp)
-  const isOpen = opp.status === 'open' && !deadlinePassed(opp) && !expired
-  const eligible = canCommit(opp, profile)
+  const eligible = canSignUp(opp, profile)
+  // Buttons only for eligible positions; anyone can still withdraw below.
+  const isOpen = opp.status === 'open' && !deadlinePassed(opp) && !expired && eligible
+  const eligibilityKey = eligibilityGroup(opp.eligible_positions)
+  const whoLabel = eligibilityLabel(opp.eligible_positions)
   const isOwner = opp.created_by === profile.id
   const canEdit = profile.role === 'admin' || (profile.role === 'poster' && isOwner)
   // Names: admins and the poster always; everyone else only if the poster allows it.
@@ -120,7 +124,7 @@ export default function OpportunityDetail() {
   const facts: { icon: typeof Clock; label: string; value: ReactNode }[] = []
   facts.push({ icon: MapPin, label: 'Location', value: locationText(opp) })
   facts.push({ icon: Monitor, label: 'Format', value: FORMAT_LABELS[opp.format] })
-  facts.push({ icon: Users, label: 'Who can commit', value: AUDIENCE_LABELS[opp.audience] })
+  facts.push({ icon: Users, label: 'Who can sign up', value: whoLabel })
   facts.push({ icon: Clock, label: 'Time', value: opp.time_estimate || COMMITMENT_LABELS[opp.commitment] })
   if (opp.start_date || opp.end_date) {
     facts.push({
@@ -166,14 +170,14 @@ export default function OpportunityDetail() {
         <ArrowLeft size={16} aria-hidden="true" /> All opportunities
       </Link>
 
-      <header className={`detail-hero opp-${opp.audience}`}>
+      <header className={`detail-hero opp-${eligibilityKey}`}>
         <span className="detail-icon">
           <OppIcon type={opp.type} topics={topics.map((t) => t.name)} size={30} />
         </span>
         <div className="detail-heading">
           <p className="eyebrow">
             {TYPE_LABELS[opp.type]}
-            {opp.audience !== 'all' ? ` · ${AUDIENCE_LABELS[opp.audience]} only` : ''}
+            {eligibilityKey !== 'everyone' ? ` · ${whoLabel} only` : ''}
             {opp.status !== 'open' ? ` · ${STATUS_LABELS[opp.status]}` : ''}
             {expired ? ' · Expired' : ''}
           </p>
@@ -228,7 +232,7 @@ export default function OpportunityDetail() {
                 <SignupBadge status={current} />
               </p>
             ) : (
-              <p className="muted">You have not signed up yet.</p>
+              <p className="muted">{eligible ? 'You have not signed up yet.' : 'View only for your position.'}</p>
             )}
 
             {current === 'completed' || current === 'no_show' ? (
@@ -238,7 +242,7 @@ export default function OpportunityDetail() {
                 {isOpen && current !== 'committed' && current !== 'waitlisted' && (
                   <button
                     className="btn btn-primary"
-                    disabled={busy || !eligible}
+                    disabled={busy}
                     onClick={() => void change('committed')}
                   >
                     {full ? 'Join the waitlist' : 'Commit'}
@@ -259,13 +263,12 @@ export default function OpportunityDetail() {
                     {current === 'interested' ? 'Remove my interest' : current === 'waitlisted' ? 'Leave the waitlist' : 'Withdraw'}
                   </button>
                 )}
-                {isOpen && !eligible && current !== 'committed' && (
+                {!eligible && (
                   <p className="small muted">
-                    Committing is open to {AUDIENCE_LABELS[opp.audience].toLowerCase()} only, but you can still
-                    show interest.
+                    This is open to {whoLabel.toLowerCase()} only. You can view it for future reference.
                   </p>
                 )}
-                {!isOpen && (
+                {eligible && !isOpen && (
                   <p className="small muted">
                     {opp.status !== 'open'
                       ? 'This opportunity is not taking sign-ups.'
