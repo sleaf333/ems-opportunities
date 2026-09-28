@@ -2,7 +2,6 @@ export type UserRole = 'member' | 'poster' | 'admin'
 export type MemberPosition = 'employed_physician' | 'partnership_track' | 'partner' | 'apc' | 'admin_staff'
 export type OppType = 'committee' | 'leadership' | 'event' | 'project' | 'other'
 export type CommitmentLevel = 'one_time' | 'short_term' | 'ongoing'
-export type OppAudience = 'all' | 'physicians' | 'partners'
 export type OppRegion = 'group_wide' | 'door_county' | 'fox_valley' | 'milwaukee' | 'watertown'
 export type OppFormat = 'in_person' | 'virtual' | 'hybrid'
 export type OppStatus = 'draft' | 'open' | 'closed' | 'archived'
@@ -68,7 +67,7 @@ export interface Opportunity {
   description: string
   commitment: CommitmentLevel
   time_estimate: string
-  audience: OppAudience
+  eligible_positions: MemberPosition[]
   capacity: number | null
   start_date: string | null
   end_date: string | null

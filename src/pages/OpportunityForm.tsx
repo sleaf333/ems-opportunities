@@ -4,11 +4,14 @@ import { useProfile } from '../auth/AuthContext'
 import { categoriesByOpportunity, fetchCategories, fetchOpportunity, fetchOpportunityCategories } from '../lib/data'
 import {
   addDays,
-  AUDIENCE_LABELS,
+  ALL_POSITIONS,
   COMMITMENT_LABELS,
+  eligibilityGroup,
+  ELIGIBILITY_GROUPS,
   FORMAT_LABELS,
   formatDate,
   localToday,
+  POSITION_LABELS,
   REGION_LABELS,
   STATUS_LABELS,
   TYPE_LABELS,
@@ -18,7 +21,7 @@ import type {
   CommitmentLevel,
   InterestCategory,
   Opportunity,
-  OppAudience,
+  MemberPosition,
   OppFormat,
   OppRegion,
   OppStatus,
@@ -35,7 +38,7 @@ interface FormState {
   description: string
   commitment: CommitmentLevel
   time_estimate: string
-  audience: OppAudience
+  eligible: MemberPosition[]
   region: OppRegion | ''
   site: string
   format: OppFormat
@@ -63,7 +66,7 @@ function fromOpportunity(o: Opportunity): FormState {
     description: o.description,
     commitment: o.commitment,
     time_estimate: o.time_estimate,
-    audience: o.audience,
+    eligible: o.eligible_positions,
     region: o.region,
     site: o.site,
     format: o.format,
@@ -92,7 +95,7 @@ export default function OpportunityForm() {
     description: '',
     commitment: 'ongoing',
     time_estimate: '',
-    audience: 'all',
+    eligible: ALL_POSITIONS,
     region: '',
     site: '',
     format: 'in_person',
@@ -181,6 +184,10 @@ export default function OpportunityForm() {
       setError('Please choose a location.')
       return
     }
+    if (form.eligible.length === 0) {
+      setError('Choose at least one position under "Who can sign up".')
+      return
+    }
     if (form.start_date && form.end_date && form.end_date < form.start_date) {
       setError('The end date is before the start date.')
       return
@@ -200,7 +207,7 @@ export default function OpportunityForm() {
       description: form.description.trim(),
       commitment: form.commitment,
       time_estimate: form.time_estimate.trim(),
-      audience: form.audience,
+      eligible_positions: ALL_POSITIONS.filter((p) => form.eligible.includes(p)),
       region: form.region,
       site: form.site.trim(),
       format: form.format,
@@ -256,25 +263,14 @@ export default function OpportunityForm() {
           <span>Title</span>
           <input value={form.title} onChange={(e) => set('title', e.target.value)} required maxLength={150} />
         </label>
-        <div className="grid-2">
-          <label className="field">
-            <span>Type</span>
-            <select value={form.type} onChange={(e) => changeType(e.target.value as OppType)}>
-              {Object.entries(TYPE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Who can commit</span>
-            <select value={form.audience} onChange={(e) => set('audience', e.target.value as OppAudience)}>
-              {Object.entries(AUDIENCE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-            <small>Anyone can mark themselves as interested.</small>
-          </label>
-        </div>
+        <label className="field field-narrow">
+          <span>Type</span>
+          <select value={form.type} onChange={(e) => changeType(e.target.value as OppType)}>
+            {Object.entries(TYPE_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+        </label>
         <label className="field">
           <span>Description</span>
           <textarea
@@ -284,6 +280,42 @@ export default function OpportunityForm() {
             placeholder={'Start lines with "- " to make bullet points.\n- Attend monthly meetings\n- Help plan the annual event'}
           />
         </label>
+      </section>
+
+      <section className="card stack">
+        <div>
+          <h2>Who can sign up</h2>
+          <p className="small muted">
+            Everyone can see this post. Only the positions checked can mark Interested or Commit.
+          </p>
+        </div>
+        <div className="chips" role="group" aria-label="Quick choices">
+          {ELIGIBILITY_GROUPS.map((g) => (
+            <button
+              type="button"
+              key={g.key}
+              className={`chip ${eligibilityGroup(form.eligible) === g.key ? 'chip-on' : ''}`}
+              aria-pressed={eligibilityGroup(form.eligible) === g.key}
+              onClick={() => set('eligible', g.positions)}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+        <div className="checks">
+          {ALL_POSITIONS.map((p) => (
+            <label key={p} className="check">
+              <input
+                type="checkbox"
+                checked={form.eligible.includes(p)}
+                onChange={(e) =>
+                  set('eligible', e.target.checked ? [...form.eligible, p] : form.eligible.filter((x) => x !== p))
+                }
+              />
+              {POSITION_LABELS[p]}
+            </label>
+          ))}
+        </div>
       </section>
 
       <section className="card stack">

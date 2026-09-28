@@ -14,10 +14,10 @@ import {
 } from '../lib/data'
 import { downloadCsv, toCsv } from '../lib/csv'
 import {
-  AUDIENCE_LABELS,
   COMMITMENT_LABELS,
   daysUntil,
   displayName,
+  eligibilityLabel,
   FORMAT_LABELS,
   formatDate,
   isExpired,
@@ -632,13 +632,13 @@ function Members({
     downloadCsv(
       `opportunities-${stamp}.csv`,
       toCsv(
-        ['Title', 'Type', 'Status', 'Location', 'Hospital or site', 'Format', 'Who can commit', 'Commitment', 'Time needed', 'Spots', 'Committed', 'Interested', 'Waitlisted', 'Start', 'End', 'Deadline', 'Show on site until', 'Expired', 'Names shown to members', 'Good for new hires', 'Topics', 'Contact', 'Contact email', 'Posted by', 'Posted'],
+        ['Title', 'Type', 'Status', 'Location', 'Hospital or site', 'Format', 'Who can sign up', 'Commitment', 'Time needed', 'Spots', 'Committed', 'Interested', 'Waitlisted', 'Start', 'End', 'Deadline', 'Show on site until', 'Expired', 'Names shown to members', 'Good for new hires', 'Topics', 'Contact', 'Contact email', 'Posted by', 'Posted'],
         data.opportunities.map((o) => {
           const mine = data.signups.filter((s) => s.opportunity_id === o.id)
           const n = (st: Signup['status'][]) => mine.filter((s) => st.includes(s.status)).length
           return [
             o.title, TYPE_LABELS[o.type], STATUS_LABELS[o.status], REGION_LABELS[o.region], o.site,
-            FORMAT_LABELS[o.format], AUDIENCE_LABELS[o.audience], COMMITMENT_LABELS[o.commitment], o.time_estimate,
+            FORMAT_LABELS[o.format], eligibilityLabel(o.eligible_positions), COMMITMENT_LABELS[o.commitment], o.time_estimate,
             o.capacity ?? 'No limit', n(['committed', 'completed']), n(['interested']), n(['waitlisted']),
             o.start_date ?? '', o.end_date ?? '', o.signup_deadline ?? '', o.visible_until ?? 'Indefinitely',
             isExpired(o) ? 'Yes' : 'No', o.show_names ? 'Yes' : 'No', o.new_hire_friendly ? 'Yes' : 'No',

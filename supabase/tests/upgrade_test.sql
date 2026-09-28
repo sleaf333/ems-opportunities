@@ -10,7 +10,10 @@ select tests.eq((select role::text from public.profiles where email = 'boss@ems-
 select tests.eq((select is_partner::text from public.member_presets where email = 'pending@ems-wi.com'), 'true', 'pending shareholder preset became partner preset');
 select tests.eq((select count(*)::text from information_schema.columns where table_name = 'profiles' and column_name = 'is_shareholder'), '0', 'shareholder column removed');
 
-select tests.eq((select audience::text from public.opportunities where title = 'Finance Committee'), 'partners', 'shareholders-only became partners-only');
+select tests.eq((select array_to_string(eligible_positions, ',') from public.opportunities where title = 'Finance Committee'), 'partner', 'shareholders-only became shareholder position only');
+select tests.eq((select array_to_string(eligible_positions, ',') from public.opportunities where title = 'Trauma'), 'employed_physician,partnership_track,partner', 'physicians-only became the three physician positions');
+select tests.eq((select array_to_string(eligible_positions, ',') from public.opportunities where title = 'Wellness Committee'), 'employed_physician,partnership_track,partner,apc,admin_staff', 'everyone became all five positions');
+select tests.eq((select count(*)::text from information_schema.columns where table_name = 'opportunities' and column_name = 'audience'), '0', 'old audience column removed');
 select tests.eq((select count(*)::text from public.opportunities), '15', 'all opportunities kept');
 select tests.eq((select count(*)::text from public.opportunities where region = 'group_wide' and visible_until is null and not show_names), '15', 'existing posts: group-wide, indefinite, names hidden');
 

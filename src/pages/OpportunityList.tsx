@@ -16,7 +16,11 @@ import {
   useLoader,
 } from '../lib/data'
 import {
+  canSignUp,
   COMMITMENT_LABELS,
+  eligibilityGroup,
+  eligibilityLabel,
+  ELIGIBILITY_GROUPS,
   FORMAT_LABELS,
   formatDate,
   isExpired,
@@ -28,7 +32,6 @@ import type {
   CommitmentLevel,
   InterestCategory,
   Opportunity,
-  OppAudience,
   OppRegion,
   OppType,
   Profile,
@@ -36,10 +39,10 @@ import type {
   SignupCounts,
 } from '../lib/types'
 
-const SECTIONS: { audience: OppAudience; title: string; blurb: string }[] = [
-  { audience: 'all', title: 'Open to everyone', blurb: 'Physicians, APCs and staff' },
-  { audience: 'physicians', title: 'For physicians', blurb: 'Anyone can show interest' },
-  { audience: 'partners', title: 'For shareholders', blurb: 'Anyone can show interest' },
+// Sections follow who can sign up; posts with an unusual mix go under "Other".
+const SECTIONS: { key: string; title: string }[] = [
+  ...ELIGIBILITY_GROUPS.map((g) => ({ key: g.key, title: g.title })),
+  { key: 'custom', title: 'Other' },
 ]
 
 const TYPE_PLURALS: Record<OppType, string> = {
@@ -74,6 +77,7 @@ export default function OpportunityList() {
   const [topic, setTopic] = useState('')
   const [newHireOnly, setNewHireOnly] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
+  const [onlyMine, setOnlyMine] = useState(false)
 
   const canSeeExpired = profile.role === 'admin' || profile.role === 'poster'
   const opportunities: Opportunity[] = data?.opportunities ?? []
@@ -117,6 +121,7 @@ export default function OpportunityList() {
     if (commitment && o.commitment !== commitment) return false
     if (topic && !(topics.get(o.id) ?? []).some((c) => c.id === topic)) return false
     if (newHireOnly && !o.new_hire_friendly) return false
+    if (onlyMine && !canSignUp(o, profile)) return false
     if (search) {
       const names = (topics.get(o.id) ?? []).map((c) => c.name).join(' ')
       const haystack = `${o.title} ${o.description} ${names} ${o.site}`.toLowerCase()
@@ -217,6 +222,11 @@ export default function OpportunityList() {
             ))}
           </select>
           <label className="switch">
+            <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+            <span className="switch-track" aria-hidden="true" />
+            Only what I can join
+          </label>
+          <label className="switch">
             <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
             <span className="switch-track" aria-hidden="true" />
             {canSeeExpired ? 'Show closed and expired' : 'Show closed'}
@@ -229,14 +239,15 @@ export default function OpportunityList() {
       {data && visible.length === 0 && <p className="empty">Nothing matches those filters.</p>}
 
       {SECTIONS.map((section) => {
-        const items = visible.filter((o) => o.audience === section.audience)
+        const items = visible.filter((o) => eligibilityGroup(o.eligible_positions) === section.key)
         if (items.length === 0) return null
+        const joinable = profile.position !== null && items.some((o) => canSignUp(o, profile))
         return (
-          <section key={section.audience} className="opp-section">
+          <section key={section.key} className="opp-section">
             <div className="section-label">
               <span className="section-title">{section.title}</span>
               <span className="section-count">{items.length}</span>
-              <span className="section-blurb">{section.blurb}</span>
+              {!joinable && <span className="section-blurb">View only for your position</span>}
             </div>
             <div className="opp-grid">
               {items.map((opp) => (
@@ -247,6 +258,7 @@ export default function OpportunityList() {
                   faces={faces.get(opp.id) ?? []}
                   topics={topics.get(opp.id) ?? []}
                   mine={mine.get(opp.id)}
+                  viewOnly={!canSignUp(opp, profile)}
                 />
               ))}
             </div>
@@ -270,12 +282,14 @@ function OpportunityCard({
   faces,
   topics,
   mine,
+  viewOnly,
 }: {
   opp: Opportunity
   counts: SignupCounts
   faces: Profile[]
   topics: InterestCategory[]
   mine?: Signup
+  viewOnly: boolean
 }) {
   const summary = opp.description
     .split('\n')
@@ -300,7 +314,7 @@ function OpportunityCard({
   return (
     <Link
       to={`/o/${opp.id}`}
-      className={`opp opp-${opp.audience} ${opp.status !== 'open' || expired ? 'opp-muted' : ''}`}
+      className={`opp opp-${eligibilityGroup(opp.eligible_positions)} ${opp.status !== 'open' || expired ? 'opp-muted' : ''}`}
     >
       <div className="opp-top">
         <span className="opp-icon">
@@ -310,6 +324,7 @@ function OpportunityCard({
           {opp.status === 'draft' && <span className="flag">Draft</span>}
           {opp.status === 'closed' && <span className="flag">Closed</span>}
           {expired && <span className="flag">Expired</span>}
+          {viewOnly && !mine && <span className="flag flag-view">View only</span>}
           {myLabel && <span className={`flag flag-mine flag-${mine!.status}`}>{myLabel}</span>}
         </span>
       </div>
@@ -323,6 +338,9 @@ function OpportunityCard({
         {opp.format !== 'in_person' && <span className="opp-format">{FORMAT_LABELS[opp.format]}</span>}
       </p>
 
+      {eligibilityGroup(opp.eligible_positions) === 'custom' && (
+        <p className="opp-deadline">Open to: {eligibilityLabel(opp.eligible_positions)}</p>
+      )}
       <p className="opp-meta">
         {meta.join(' · ')}
         {opp.new_hire_friendly && (
