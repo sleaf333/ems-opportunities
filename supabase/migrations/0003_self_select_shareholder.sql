@@ -6,5 +6,6 @@
 -- Before this, only an admin could set or remove the Shareholder position.
 -- Admins can still set it for anyone from the Admin page.
 
-drop trigger profiles_guard_partner on public.profiles;
-drop function public.guard_partner_position();
+-- "if exists" makes running this a second time harmless.
+drop trigger if exists profiles_guard_partner on public.profiles;
+drop function if exists public.guard_partner_position();
