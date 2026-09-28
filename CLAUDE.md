@@ -11,4 +11,4 @@ Project owner is not a professional developer; explain changes in plain language
 - Checks before pushing: `npm run build` and `npm run test:db` (add tests to `supabase/tests/permissions_test.sql` for new rules).
 - Writing for the owner or the group: no em dashes.
 - Supabase grants anon/authenticated EXECUTE on new public functions by default: in each new migration, revoke from public/anon/authenticated and grant back only what the site calls.
-- Brand colors are the four variables at the top of src/styles.css (--brand, --brand-deep, --brand-2, --brand-3, plus dark-mode overrides). Placeholders until the real ems-wi.com colors are confirmed.
+- Brand colors are at the top of src/styles.css, sampled from ems-wi.com screenshots (logo blue #226DA7, five dots #B1DEF6 #6BAEDB #0D6CB3 #094A7D #0B2440, heading indigo #0D0149, turquoise rule #25EFF5). Fonts are free lookalikes: Syncopate (wide caps headings), Cormorant Garamond italic (taglines), Figtree (body).

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import BrandLogo from '../components/BrandLogo'
 import { EMAIL_DOMAIN, friendlyError, isAllowedEmail, supabase } from '../lib/supabase'
 
 export default function Login() {
@@ -48,13 +49,12 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="card login-card stack">
-        <div className="brand brand-large">
-          <span className="brand-mark" aria-hidden="true">+</span>
-          EMS Opportunities
+        <BrandLogo large />
+        <div className="login-intro">
+          <h1>Get involved</h1>
+          <span className="rule" aria-hidden="true" />
+          <p className="tagline">Committees, leadership roles and events across the group, in one place.</p>
         </div>
-        <p className="muted">
-          Committees, leadership roles and events across the group, in one place.
-        </p>
 
         {step === 'email' ? (
           <form onSubmit={sendCode} className="stack">

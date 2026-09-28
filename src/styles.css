@@ -1,24 +1,36 @@
 /* ==========================================================================
-   Brand colors. Swap these to match ems-wi.com; everything else follows.
+   Brand colors, sampled from ems-wi.com (logo, five-dot mark, headings and
+   the turquoise underline). Everything else is derived from these.
    ========================================================================== */
 :root {
-  --brand: #14507d; /* primary: buttons, links, active states */
-  --brand-deep: #0c3354; /* darker end of the hero gradient */
-  --brand-2: #1c8c86; /* secondary accent: physician opportunities */
-  --brand-3: #b8863b; /* tertiary accent: shareholder opportunities */
-  --hero-mid: var(--brand); /* middle of the hero gradient */
+  --dot-1: #b1def6;
+  --dot-2: #6baedb;
+  --dot-3: #0d6cb3;
+  --dot-4: #094a7d;
+  --dot-5: #0b2440;
+  --logo-blue: #226da7; /* "EMS" wordmark */
+  --indigo: #0d0149; /* large headings on ems-wi.com */
+  --turquoise: #25eff5; /* underline rule on ems-wi.com */
+
+  --brand: var(--dot-3); /* buttons, links, active states */
+  --brand-deep: var(--dot-5); /* dark end of the hero gradient */
+  --hero-mid: var(--dot-4); /* middle of the hero gradient */
+  --heading: var(--indigo);
+  --on-brand: #ffffff; /* text on brand-colored buttons */
+  --brand-2: #0a8a9c; /* physicians accent: deepened turquoise, readable on white */
+  --brand-3: #3d2f99; /* shareholders accent: lifted indigo */
 }
 
 /* ==========================================================================
    Design tokens
    ========================================================================== */
 :root {
-  --bg: #f6f5f1;
+  --bg: #f5f8fb;
   --surface: #ffffff;
-  --surface-2: #f1f0ec;
-  --text: #16202c;
-  --muted: #637080;
-  --hairline: rgba(22, 32, 44, 0.08);
+  --surface-2: #eef3f8;
+  --text: #2c2f35;
+  --muted: #5f6873;
+  --hairline: rgba(11, 36, 64, 0.09);
   --brand-soft: color-mix(in srgb, var(--brand) 10%, transparent);
   --danger: #b42318;
   --success: #0f7a4f;
@@ -31,8 +43,9 @@
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 30px -14px rgba(16, 24, 40, 0.16);
   --shadow-lift: 0 2px 4px rgba(16, 24, 40, 0.05), 0 22px 44px -18px rgba(16, 24, 40, 0.28);
-  --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font: 'Figtree', 'Proxima Nova', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Syncopate', 'Figtree', system-ui, sans-serif; /* wide capitals, like ems-wi.com headings */
+  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; /* italic taglines */
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   color-scheme: light;
   font-family: var(--font);
@@ -44,14 +57,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --brand: #6fa8dc;
-    --brand-deep: #0e2a44;
-    --brand-2: #4fc1b9;
-    --brand-3: #e0b56a;
-    --hero-mid: #1b4a73;
-    --bg: #0f141a;
-    --surface: #171e27;
-    --surface-2: #1f2833;
+    --brand: var(--dot-2);
+    --brand-deep: #081a2f;
+    --hero-mid: #0c3a63;
+    --heading: #eef3fa;
+    --on-brand: #06121f;
+    --brand-2: #3fd6e0;
+    --brand-3: #a99cf5;
+    --bg: #0b1320;
+    --surface: #121d2c;
+    --surface-2: #1a2738;
     --text: #e8ecf1;
     --muted: #97a3b3;
     --hairline: rgba(255, 255, 255, 0.08);
@@ -75,8 +90,8 @@
 body {
   margin: 0;
   background:
-    radial-gradient(900px 420px at 85% -120px, color-mix(in srgb, var(--brand-2) 12%, transparent), transparent 70%),
-    radial-gradient(800px 380px at -10% -80px, color-mix(in srgb, var(--brand) 10%, transparent), transparent 70%),
+    radial-gradient(900px 420px at 85% -120px, color-mix(in srgb, var(--dot-1) 38%, transparent), transparent 70%),
+    radial-gradient(800px 380px at -10% -80px, color-mix(in srgb, var(--dot-2) 16%, transparent), transparent 70%),
     var(--bg);
   background-attachment: fixed;
 }
@@ -90,9 +105,12 @@ h3 {
 }
 h1 {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(1.7rem, 3vw, 2.2rem);
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--heading);
+  line-height: 1.15;
 }
 h2 {
   font-size: 1.1rem;
@@ -157,19 +175,96 @@ code {
   text-decoration: none;
   letter-spacing: -0.01em;
 }
-.brand-large {
-  font-size: 1.25rem;
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  line-height: 1;
 }
-.brand-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 10px;
-  background: linear-gradient(140deg, var(--brand), var(--brand-2));
-  color: #fff;
-  font-weight: 800;
-  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--brand) 70%, transparent);
+.logo-ems {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 1.55rem;
+  letter-spacing: 0.08em;
+  color: var(--logo-blue);
+}
+.logo-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.logo-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.logo-dots i:nth-child(1),
+.hero-dots i:nth-child(1) {
+  background: var(--dot-1);
+}
+.logo-dots i:nth-child(2),
+.hero-dots i:nth-child(2) {
+  background: var(--dot-2);
+}
+.logo-dots i:nth-child(3),
+.hero-dots i:nth-child(3) {
+  background: var(--dot-3);
+}
+.logo-dots i:nth-child(4),
+.hero-dots i:nth-child(4) {
+  background: var(--dot-4);
+}
+.logo-dots i:nth-child(5),
+.hero-dots i:nth-child(5) {
+  background: var(--dot-5);
+}
+.logo-sub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--hairline);
+}
+.logo-large .logo-ems {
+  font-size: 2.1rem;
+}
+.logo-large .logo-dots i {
+  width: 9px;
+  height: 9px;
+}
+@media (prefers-color-scheme: dark) {
+  .logo-ems {
+    color: var(--dot-2);
+  }
+  .logo-dots i:nth-child(5) {
+    background: var(--dot-2);
+    opacity: 0.35;
+  }
+}
+
+/* Signature turquoise underline from ems-wi.com */
+.rule {
+  display: block;
+  height: 2px;
+  background: var(--turquoise);
+  border-radius: 2px;
+  width: 100%;
+  max-width: 420px;
+}
+.tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.35rem;
+  line-height: 1.3;
+}
+.login-intro > * + * {
+  margin-top: 0.7rem;
+}
+.login-intro .tagline {
+  color: var(--muted);
+  font-size: 1.25rem;
 }
 .nav {
   display: flex;
@@ -434,7 +529,7 @@ input[type='checkbox'] {
 }
 .btn-primary {
   background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 70%, var(--brand-2)));
-  color: #fff;
+  color: var(--on-brand);
   box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--brand) 80%, transparent);
 }
 .btn-primary:hover:not(:disabled) {
@@ -526,7 +621,7 @@ input[type='checkbox'] {
 .chip-on {
   background: var(--brand);
   border-color: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
 }
 .tag {
   font-size: 0.8rem;
@@ -575,12 +670,38 @@ input[type='checkbox'] {
   bottom: -210px;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 65%);
 }
-.hero .eyebrow {
-  color: rgba(255, 255, 255, 0.75);
+.hero .tagline {
+  color: var(--dot-1);
+  font-size: 1.5rem;
 }
 .hero h1 {
-  font-size: clamp(2rem, 5vw, 3rem);
-  margin-top: 0.35rem;
+  font-size: clamp(1.7rem, 4.6vw, 2.9rem);
+  margin-top: 0.4rem;
+  color: #fff;
+  text-wrap: balance;
+}
+.hero .rule-bleed {
+  max-width: none;
+  width: auto;
+  margin: 1rem calc(-1 * clamp(1.6rem, 4vw, 2.8rem)) 0 0;
+}
+.hero-dots {
+  position: absolute;
+  right: clamp(1.6rem, 4vw, 2.8rem);
+  top: clamp(1.6rem, 4vw, 2.8rem);
+  display: flex;
+  gap: 8px;
+}
+.hero-dots i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.35);
+}
+@media (max-width: 560px) {
+  .hero-dots {
+    display: none;
+  }
 }
 .hero-lede {
   max-width: 560px;
@@ -662,7 +783,7 @@ input[type='checkbox'] {
   color: var(--text);
 }
 .pill-on {
-  background: var(--text);
+  background: var(--heading);
   color: var(--surface);
   box-shadow: none;
 }
@@ -743,16 +864,26 @@ input[type='checkbox'] {
 
 .section-label {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.6rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.1rem;
   flex-wrap: wrap;
+}
+.section-label::after {
+  content: '';
+  flex: 1 1 60px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--turquoise), color-mix(in srgb, var(--turquoise) 0%, transparent));
+  opacity: 0.8;
 }
 .section-title {
   font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--heading);
 }
 .section-count {
   font-size: 0.78rem;
@@ -856,11 +987,11 @@ input[type='checkbox'] {
   color: var(--warning);
 }
 .opp-title {
-  font-family: var(--font-display);
-  font-size: 1.28rem;
-  font-weight: 600;
-  line-height: 1.22;
-  letter-spacing: -0.015em;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--heading);
   margin-top: 0.15rem;
 }
 .opp-summary {
@@ -996,8 +1127,8 @@ input[type='checkbox'] {
   color: var(--accent);
 }
 .detail-hero h1 {
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
-  margin: 0.25rem 0 0.35rem;
+  font-size: clamp(1.3rem, 3.2vw, 2rem);
+  margin: 0.35rem 0 0.5rem;
 }
 .detail-icon {
   display: grid;
@@ -1134,8 +1265,8 @@ input[type='checkbox'] {
 }
 .stat strong {
   font-family: var(--font-display);
-  font-size: 2.2rem;
-  font-weight: 600;
+  font-size: 2rem;
+  font-weight: 700;
   line-height: 1;
   color: var(--brand);
 }

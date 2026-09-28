@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth, useProfile } from '../auth/AuthContext'
+import BrandLogo from './BrandLogo'
 
 export default function Layout() {
   const profile = useProfile()
@@ -10,9 +11,8 @@ export default function Layout() {
     <div className="app">
       <header className="topbar">
         <div className="topbar-inner">
-          <Link to="/" className="brand">
-            <span className="brand-mark" aria-hidden="true">+</span>
-            EMS Opportunities
+          <Link to="/" className="brand" aria-label="EMS Opportunities home">
+            <BrandLogo />
           </Link>
           <nav className="nav">
             <NavLink to="/" end>Opportunities</NavLink>

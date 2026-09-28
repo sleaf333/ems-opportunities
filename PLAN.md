@@ -143,3 +143,4 @@ The real definitions are in `supabase/migrations/0001_init.sql`. In short:
 | 2026-09-28 | Anyone can mark Interested in any opportunity; committing is limited by position or the shareholder flag |
 | 2026-09-28 | Sign in with a typed 6-digit code, not a clickable link, because Microsoft 365 link scanning can use up one-time links; codes also work across devices |
 | 2026-09-28 | Brevo for sign-in emails (Resend needs a domain we own) |
+| 2026-09-28 | Match ems-wi.com branding: colors sampled from site screenshots; free lookalike fonts (Syncopate, Cormorant Garamond, Figtree); EMS five-dot mark recreated in code |

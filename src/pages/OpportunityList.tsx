@@ -93,8 +93,9 @@ export default function OpportunityList() {
     <div className="stack-lg">
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">Get involved</p>
-          <h1>Find where you fit.</h1>
+          <p className="tagline">Get involved</p>
+          <h1>Find where you fit</h1>
+          <span className="rule rule-bleed" aria-hidden="true" />
           <p className="hero-lede">
             Committees, leadership roles and events across the group. Raise your hand with no strings attached, or
             commit to take a spot.
@@ -120,6 +121,13 @@ export default function OpportunityList() {
             </span>
           </div>
         )}
+        <span className="hero-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
       </section>
 
       <div className="toolbar">
