@@ -1816,3 +1816,146 @@ tr.expanded td {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* ==========================================================================
+   Moments of delight (all switched off by the reduce-motion rule above;
+   the burst and count-ups also check it in code)
+   ========================================================================== */
+
+:root {
+  --burst-1: var(--dot-1);
+  --burst-2: var(--dot-2);
+  --burst-3: var(--dot-3);
+  --burst-4: var(--dot-4);
+  --burst-5: var(--dot-5);
+}
+@media (prefers-color-scheme: dark) {
+  /* The two darkest dots vanish on dark surfaces; use the light ones twice. */
+  :root {
+    --burst-4: var(--dot-1);
+    --burst-5: var(--dot-2);
+  }
+}
+
+/* Commit: a burst of the five EMS dots, in a layer that never scrolls the page or blocks clicks. */
+.celebrate {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 50;
+}
+.celebrate i {
+  position: absolute;
+  border-radius: 50%;
+  translate: -50% -50%;
+  opacity: 0;
+  animation: burst 0.9s var(--ease, cubic-bezier(0.2, 0.8, 0.2, 1)) forwards;
+}
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--angle)) translateX(0) scale(0.4);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateX(var(--distance)) scale(1);
+  }
+}
+
+.joined {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  color: var(--heading);
+  animation: joined-in 0.35s ease-out both;
+}
+.joined-check {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: none;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.joined-check circle {
+  stroke: var(--success);
+  stroke-width: 2;
+  stroke-dasharray: 66;
+  stroke-dashoffset: 66;
+  animation: draw 0.5s ease-out forwards;
+}
+.joined-check path {
+  stroke: var(--success);
+  stroke-width: 2.4;
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: draw 0.3s 0.4s ease-out forwards;
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes joined-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* With animation off, show the check fully drawn. */
+  .joined-check circle,
+  .joined-check path {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Interested: one soft ring pulses out from the badge. */
+.ripple {
+  position: relative;
+  display: inline-block;
+}
+.ripple::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  border: 2px solid var(--brand);
+  opacity: 0;
+  pointer-events: none;
+  animation: ripple 0.7s ease-out;
+}
+@keyframes ripple {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* Spots bars fill from empty when the list appears. */
+.spots-bar span {
+  transform-origin: left center;
+  animation: fill 0.8s 0.1s var(--ease, ease-out) both;
+}
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* Digits keep their width while counting, so nothing next to them jiggles. */
+.count-up {
+  font-variant-numeric: tabular-nums;
+}

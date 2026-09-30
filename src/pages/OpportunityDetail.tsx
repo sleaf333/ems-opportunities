@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   ArrowLeft,
   CalendarClock,
@@ -20,6 +20,8 @@ import { useProfile } from '../auth/AuthContext'
 import { Avatar } from '../components/Avatars'
 import { SignupBadge } from '../components/Badges'
 import OppIcon from '../components/OppIcon'
+import Celebrate from '../components/Celebrate'
+import CountUp from '../components/CountUp'
 import Description from '../components/Description'
 import EmailPeople from '../components/EmailPeople'
 import {
@@ -87,6 +89,11 @@ export default function OpportunityDetail() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [ownerNotice, setOwnerNotice] = useState<string | null>(null)
+  // Moments of delight: a burst on Commit, a ripple on Interested.
+  const [celebrateKey, setCelebrateKey] = useState(0)
+  const [justJoined, setJustJoined] = useState(false)
+  const [rippleKey, setRippleKey] = useState(0)
+  const statusRef = useRef<HTMLElement>(null)
 
   if (error) return <p className="error">Could not load this opportunity: {error}</p>
   if (loading && !data) return <p className="muted">Loading…</p>
@@ -139,6 +146,9 @@ export default function OpportunityDetail() {
     if (result === 'waitlisted') {
       setNotice('All spots are taken, so you are on the waitlist. You will move up automatically if a spot opens.')
     }
+    setJustJoined(result === 'committed')
+    if (result === 'committed') setCelebrateKey((k) => k + 1)
+    if (result === 'interested') setRippleKey((k) => k + 1)
     await reload()
   }
 
@@ -250,11 +260,22 @@ export default function OpportunityDetail() {
         </article>
 
         <aside className="stack">
-          <section className="panel panel-action stack">
+          <section ref={statusRef} className="panel panel-action stack">
             <h2 className="panel-title">Your status</h2>
+            {justJoined && current === 'committed' && (
+              <p className="joined">
+                <svg className="joined-check" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10.5" />
+                  <path d="M7.5 12.5l3 3 6-6.5" />
+                </svg>
+                You're in!
+              </p>
+            )}
             {current && current !== 'withdrawn' ? (
               <p>
-                <SignupBadge status={current} />
+                <span key={rippleKey} className={rippleKey ? 'ripple' : undefined}>
+                  <SignupBadge status={current} />
+                </span>
               </p>
             ) : (
               <p className="muted">{eligible ? 'You have not signed up yet.' : 'View only for your position.'}</p>
@@ -340,14 +361,14 @@ export default function OpportunityDetail() {
               <>
                 <div className="count-row">
                   <span>
-                    <strong>{counts?.committed ?? 0}</strong> committed
+                    <strong><CountUp value={counts?.committed ?? 0} /></strong> committed
                   </span>
                   <span>
-                    <strong>{counts?.interested ?? 0}</strong> interested
+                    <strong><CountUp value={counts?.interested ?? 0} /></strong> interested
                   </span>
                   {(counts?.waitlisted ?? 0) > 0 && (
                     <span>
-                      <strong>{counts?.waitlisted}</strong> waitlisted
+                      <strong><CountUp value={counts?.waitlisted ?? 0} /></strong> waitlisted
                     </span>
                   )}
                 </div>
@@ -373,6 +394,7 @@ export default function OpportunityDetail() {
       </div>
 
       {isAdmin && <EditHistory changes={history} people={people} />}
+      <Celebrate burstKey={celebrateKey} anchor={statusRef} />
     </div>
   )
 }

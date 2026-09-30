@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, MapPin, Search, Sprout } from 'lucide-react'
 import { useProfile } from '../auth/AuthContext'
 import { AvatarStack } from '../components/Avatars'
+import CountUp from '../components/CountUp'
 import OppIcon from '../components/OppIcon'
 import {
   byId,
@@ -157,10 +158,10 @@ export default function OpportunityList() {
         {data && (
           <div className="hero-stats">
             <span>
-              <strong>{live.length}</strong> open now
+              <strong><CountUp value={live.length} /></strong> open now
             </span>
             <span>
-              <strong>{totalSignups}</strong> {totalSignups === 1 ? 'sign-up' : 'sign-ups'} so far
+              <strong><CountUp value={totalSignups} /></strong> {totalSignups === 1 ? 'sign-up' : 'sign-ups'} so far
             </span>
           </div>
         )}
