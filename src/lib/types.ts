@@ -94,6 +94,31 @@ export interface OpportunityOwner {
   added_at: string
 }
 
+// Previous values of a post's changed fields (admins only).
+export interface OpportunityChange {
+  id: number
+  opportunity_id: string
+  changed_at: string
+  changed_by: string | null
+  changed_fields: string[]
+  old_values: Record<string, unknown>
+}
+
+export interface RoleChange {
+  id: number
+  user_id: string
+  old_role: UserRole | null
+  new_role: UserRole
+  changed_by: string | null
+  changed_at: string
+}
+
+export interface BackupRecord {
+  id: number
+  downloaded_by: string | null
+  downloaded_at: string
+}
+
 export interface Signup {
   id: string
   opportunity_id: string

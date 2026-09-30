@@ -95,6 +95,8 @@ function makeData(parts: Partial<AdminData>): AdminData {
     interests: [],
     memberCats: [],
     presets: [],
+    recentRoleChanges: [],
+    lastBackup: null,
     ...parts,
   }
 }

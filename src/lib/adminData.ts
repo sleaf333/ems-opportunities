@@ -1,33 +1,51 @@
 // Everything the admin pages (Manage and Insights) load. Admins can read all
 // of it through row-level security; nobody else gets these rows.
-import { categoriesByOpportunity, fetchCategories, fetchOpportunities, fetchOpportunityCategories, fetchProfiles, fetchSignups } from './data'
+import {
+  categoriesByOpportunity,
+  fetchCategories,
+  fetchOpportunities,
+  fetchOpportunityCategories,
+  fetchProfiles,
+  fetchSignups,
+  pageThrough,
+} from './data'
 import { supabase } from './supabase'
-import type { MemberInterestCategory, MemberInterests, MemberPreset, SignupEvent } from './types'
+import type { BackupRecord, MemberInterestCategory, MemberInterests, MemberPreset, RoleChange, SignupEvent } from './types'
 
 export async function loadAdminData() {
-  const [profiles, opportunities, signups, categories, links, events, interests, memberCats, presets] =
+  const [profiles, opportunities, signups, categories, links, events, interests, memberCats, presets, roleChanges, backups] =
     await Promise.all([
       fetchProfiles(),
       fetchOpportunities(),
       fetchSignups(),
       fetchCategories(),
       fetchOpportunityCategories(),
-      supabase.from('signup_events').select('*').order('changed_at'),
-      supabase.from('member_interests').select('*'),
-      supabase.from('member_interest_categories').select('*'),
-      supabase.from('member_presets').select('*').order('email'),
+      pageThrough<SignupEvent>((from, to) =>
+        supabase.from('signup_events').select('*').order('changed_at').order('id').range(from, to),
+      ),
+      pageThrough<MemberInterests>((from, to) =>
+        supabase.from('member_interests').select('*').order('user_id').range(from, to),
+      ),
+      pageThrough<MemberInterestCategory>((from, to) =>
+        supabase.from('member_interest_categories').select('*').order('user_id').order('category_id').range(from, to),
+      ),
+      pageThrough<MemberPreset>((from, to) => supabase.from('member_presets').select('*').order('email').range(from, to)),
+      supabase.from('role_changes').select('*').order('id', { ascending: false }).limit(10),
+      supabase.from('backup_log').select('*').order('id', { ascending: false }).limit(1),
     ])
-  for (const r of [events, interests, memberCats, presets]) if (r.error) throw new Error(r.error.message)
+  for (const r of [roleChanges, backups]) if (r.error) throw new Error(r.error.message)
   return {
     profiles,
     opportunities,
     signups,
     categories,
     topics: categoriesByOpportunity(links, categories),
-    events: events.data as SignupEvent[],
-    interests: interests.data as MemberInterests[],
-    memberCats: memberCats.data as MemberInterestCategory[],
-    presets: presets.data as MemberPreset[],
+    events,
+    interests,
+    memberCats,
+    presets,
+    recentRoleChanges: roleChanges.data as RoleChange[],
+    lastBackup: ((backups.data as BackupRecord[])[0] ?? null) as BackupRecord | null,
   }
 }
 export type AdminData = Awaited<ReturnType<typeof loadAdminData>>

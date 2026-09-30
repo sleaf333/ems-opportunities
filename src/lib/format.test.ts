@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canSignUp, eligibilityGroup, eligibilityLabel, eligibilityPhrase } from './format'
+import { canSignUp, describeOldValue, eligibilityGroup, eligibilityLabel, eligibilityPhrase, fieldLabel, formatDate } from './format'
 import type { MemberPosition, Opportunity, Profile } from './types'
 
 const member = (position: MemberPosition): Profile => ({
@@ -31,5 +31,25 @@ describe('who can sign up', () => {
     for (const p of ['employed_physician', 'partnership_track', 'partner', 'admin_staff'] as MemberPosition[]) {
       expect(canSignUp(apcOnly, member(p))).toBe(false)
     }
+  })
+})
+
+describe('edit history wording', () => {
+  it('names fields the way the form does', () => {
+    expect(fieldLabel('region')).toBe('Location')
+    expect(fieldLabel('eligible_positions')).toBe('Who can sign up')
+    expect(fieldLabel('something_new')).toBe('something_new')
+  })
+
+  it('shows old values in plain words', () => {
+    expect(describeOldValue('region', 'fox_valley')).toBe('Fox Valley')
+    expect(describeOldValue('status', 'closed')).toBe('Closed')
+    expect(describeOldValue('show_names', false)).toBe('No')
+    expect(describeOldValue('visible_until', null)).toBe('Indefinitely')
+    expect(describeOldValue('capacity', null)).toBe('No limit')
+    expect(describeOldValue('site', '')).toBe('(empty)')
+    expect(describeOldValue('eligible_positions', ['apc'])).toBe('APCs')
+    expect(describeOldValue('title', 'Wellness Committee')).toBe('Wellness Committee')
+    expect(describeOldValue('signup_deadline', '2026-10-05')).toBe(formatDate('2026-10-05'))
   })
 })

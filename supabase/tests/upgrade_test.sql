@@ -37,4 +37,12 @@ select tests.eq(
   'Trauma', 'existing posts: creator became owner');
 select tests.eq((select count(*)::text from public.opportunity_owners), '1', 'posts without a creator have no owner');
 
+select tests.eq(
+  (select string_agg(conname || '=' || confdeltype::text, ',' order by conname) from pg_constraint
+   where conname in ('signups_user_id_fkey', 'signups_opportunity_id_fkey', 'signup_events_user_id_fkey',
+                     'signup_events_opportunity_id_fkey', 'signup_events_signup_id_fkey', 'member_interest_categories_user_id_fkey')),
+  'member_interest_categories_user_id_fkey=r,signup_events_opportunity_id_fkey=r,signup_events_signup_id_fkey=r,signup_events_user_id_fkey=r,signups_opportunity_id_fkey=r,signups_user_id_fkey=r',
+  'existing data: deletes with history now blocked');
+select tests.expect_error($$delete from auth.users where email = 'holder@ems-wi.com'$$, '%violates foreign key constraint%');
+
 \o

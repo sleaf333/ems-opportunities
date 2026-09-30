@@ -52,7 +52,7 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 - [x] "My sign-ups" page for each member
 - [x] Full history log of every sign-up change (who, what, when)
 - [x] Admin engagement table with an "Interested but never committed" filter
-- [x] CSV exports of members, opportunities, sign-ups and history (admin); these also serve as the backup
+- [x] CSV exports of members, opportunities, sign-ups and history (admin), plus a one-file full backup of every table
 - [x] Every opportunity has its own link to paste into the newsletter; people who are not signed in land there after signing in
 
 ### Phase 1.5: Second round (built)
@@ -124,7 +124,7 @@ The real definitions are in `supabase/migrations/`. In short:
 
 **Free-plan limits and how the plan handles them** (these change, so confirm current terms before launch):
 - **Supabase pauses a free project after about a week with no activity.** A group of 150 using the site will usually keep it active. If it does pause, an admin restores it from the Supabase dashboard with one click and no data is lost. A free scheduled job (GitHub Actions) that touches the database once a week would prevent pausing; check Supabase's terms before relying on that.
-- **Supabase's free plan does not include automatic backups.** An admin downloads the CSV export once a month and stores it in the group's OneDrive or SharePoint.
+- **Supabase's free plan does not include automatic backups.** An admin downloads the full backup once a month (the Admin page reminds them after 30 days) and stores it in the group's OneDrive or SharePoint.
 - **Email sending limits.** Brevo's free plan has been about 300 emails a day. People stay signed in on their own devices, so login emails are occasional. **Launch day is the risk:** if everyone signs in at once, the day's limit may run out. Invite people in batches (for example, about 50 a day) or use Brevo's higher limit. Supabase also has its own hourly login-email limit, which can be raised in its settings.
 - Database size (500 MB free) is far more than 150 people will ever use.
 
@@ -178,3 +178,5 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-30 | Add an "APCs only" preset and section; some posts are intentionally closed to all physician positions |
 | 2026-09-30 | Posts can have several owners (for co-chairs), added and removed only by admins, by email, after the person has signed in once. Adding a plain member makes them a poster; removing an owner leaves their role alone. The seeded committees start with no owner |
 | 2026-09-30 | "My posts" menu item for posters and admins, with group email links (Bcc) and a copy-addresses fallback for long lists |
+| 2026-09-30 | Safety net: deleting a person or post with any activity is blocked in the database (deliberate erase commands exist for the SQL editor only); every post edit and role change is logged; admins download a one-file full backup, and each download is recorded |
+| 2026-09-30 | The member directory (names, emails, positions, roles) stays readable to signed-in members, like the Outlook address book; interests, goals and history stay private to the member and admins |
