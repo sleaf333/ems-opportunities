@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bccMailto, pasteList, uniqueEmails } from './email'
+import { bccMailto, outlookWebCompose, pasteList, uniqueEmails } from './email'
 
 describe('group email helpers', () => {
   it('drops blanks and duplicates, ignoring case', () => {
@@ -14,5 +14,11 @@ describe('group email helpers', () => {
 
   it('makes a list Outlook accepts when pasted', () => {
     expect(pasteList(['a@ems-wi.com', 'b@ems-wi.com'])).toBe('a@ems-wi.com; b@ems-wi.com')
+  })
+
+  it('opens a new Outlook on the web message with the subject filled in', () => {
+    expect(outlookWebCompose('Wellness & Peer Support')).toBe(
+      'https://outlook.office.com/mail/deeplink/compose?subject=Wellness%20%26%20Peer%20Support',
+    )
   })
 })
