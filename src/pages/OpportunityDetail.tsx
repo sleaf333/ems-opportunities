@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import {
   ArrowLeft,
   CalendarClock,
@@ -12,6 +12,7 @@ import {
   Pencil,
   Sprout,
   Ticket,
+  UserPlus,
   Users,
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
@@ -20,6 +21,7 @@ import { Avatar } from '../components/Avatars'
 import { SignupBadge } from '../components/Badges'
 import OppIcon from '../components/OppIcon'
 import Description from '../components/Description'
+import EmailPeople from '../components/EmailPeople'
 import {
   byId,
   categoriesByOpportunity,
@@ -27,6 +29,7 @@ import {
   fetchCounts,
   fetchOpportunity,
   fetchOpportunityCategories,
+  fetchOwners,
   fetchProfiles,
   fetchSignupsFor,
   useLoader,
@@ -48,22 +51,23 @@ import {
   TYPE_LABELS,
 } from '../lib/format'
 import { friendlyError, supabase } from '../lib/supabase'
-import type { Profile, Signup, SignupStatus } from '../lib/types'
+import type { OpportunityOwner, Profile, Signup, SignupStatus } from '../lib/types'
 
 export default function OpportunityDetail() {
   const { id = '' } = useParams()
   const profile = useProfile()
   const { data, error, loading, reload } = useLoader(async () => {
-    const [opp, signups, profiles, counts, categories, links] = await Promise.all([
+    const [opp, signups, profiles, counts, categories, links, owners] = await Promise.all([
       fetchOpportunity(id),
       fetchSignupsFor(id), // only rows this person may see
       fetchProfiles(),
       fetchCounts(),
       fetchCategories(),
       fetchOpportunityCategories(),
+      fetchOwners(id),
     ])
     const topics = categoriesByOpportunity(links, categories).get(id) ?? []
-    return [opp, signups, profiles, counts.get(id), topics] as const
+    return [opp, signups, profiles, counts.get(id), topics, owners] as const
   }, [id])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -73,7 +77,7 @@ export default function OpportunityDetail() {
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
-  const [opp, signups, profiles, counts, topics] = data
+  const [opp, signups, profiles, counts, topics, owners] = data
   if (!opp) {
     return (
       <div className="card">
@@ -93,10 +97,12 @@ export default function OpportunityDetail() {
   const isOpen = opp.status === 'open' && !deadlinePassed(opp) && !expired && eligible
   const eligibilityKey = eligibilityGroup(opp.eligible_positions)
   const whoLabel = eligibilityLabel(opp.eligible_positions)
-  const isOwner = opp.created_by === profile.id
-  const canEdit = profile.role === 'admin' || (profile.role === 'poster' && isOwner)
-  // Names: admins and the poster always; everyone else only if the poster allows it.
-  const namesVisible = profile.role === 'admin' || isOwner || opp.show_names
+  const isAdmin = profile.role === 'admin'
+  const isOwner = owners.some((o) => o.user_id === profile.id)
+  const canEdit = isAdmin || (profile.role === 'poster' && isOwner)
+  // Names: admins and owners always; everyone else only if the owners allow it.
+  const namesVisible = isAdmin || isOwner || opp.show_names
+  const manages = isAdmin || isOwner
   const committedCount = counts?.committed ?? 0
   const full = opp.capacity !== null && committedCount >= opp.capacity
 
@@ -288,17 +294,27 @@ export default function OpportunityDetail() {
             <h2 className="panel-title">Who's in</h2>
             {namesVisible ? (
               <>
-                <PeopleList title="Committed" rows={group(['committed', 'completed'])} people={people} />
-                <PeopleList title="Waitlist" rows={group(['waitlisted'])} people={people} ordered />
-                <PeopleList title="Interested" rows={group(['interested'])} people={people} />
-                {(canEdit || isOwner) && (
-                  <PeopleList title="Withdrawn" rows={group(['withdrawn', 'no_show'])} people={people} />
+                <PeopleList title="Committed" rows={group(['committed', 'completed'])} people={people} linked={manages} />
+                <PeopleList title="Waitlist" rows={group(['waitlisted'])} people={people} linked={manages} ordered />
+                <PeopleList title="Interested" rows={group(['interested'])} people={people} linked={manages} />
+                {manages && (
+                  <PeopleList title="Withdrawn" rows={group(['withdrawn', 'no_show'])} people={people} linked />
                 )}
-                {(profile.role === 'admin' || isOwner) && (
+                {manages && (
+                  <EmailPeople
+                    subject={opp.title}
+                    groups={[
+                      { label: 'Committed', people: profilesOf(group(['committed', 'completed']), people) },
+                      { label: 'Waitlist', people: profilesOf(group(['waitlisted']), people) },
+                      { label: 'Interested', people: profilesOf(group(['interested']), people) },
+                    ]}
+                  />
+                )}
+                {manages && (
                   <p className="small muted">
                     {opp.show_names
                       ? 'Everyone signed in can see these names.'
-                      : 'Only you, the poster and admins can see these names.'}
+                      : "Only this post's owners and admins can see these names."}
                   </p>
                 )}
               </>
@@ -318,14 +334,156 @@ export default function OpportunityDetail() {
                   )}
                 </div>
                 <p className="small muted names-hidden">
-                  <EyeOff size={14} aria-hidden="true" /> Names are visible to the organizer and admins.
+                  <EyeOff size={14} aria-hidden="true" /> Names are visible to the post's owners and admins.
                 </p>
               </>
             )}
           </section>
+
+          {manages && (
+            <OwnersPanel
+              opportunityId={opp.id}
+              owners={owners}
+              people={people}
+              me={profile.id}
+              isAdmin={isAdmin}
+              onChange={reload}
+            />
+          )}
         </aside>
       </div>
     </div>
+  )
+}
+
+function profilesOf(rows: Signup[], people: Map<string, Profile>): Profile[] {
+  return rows.map((s) => people.get(s.user_id)).filter((p): p is Profile => Boolean(p))
+}
+
+// Who owns this post. Admins add owners by email (the person must have signed
+// in once) and remove them; the database enforces both.
+function OwnersPanel({
+  opportunityId,
+  owners,
+  people,
+  me,
+  isAdmin,
+  onChange,
+}: {
+  opportunityId: string
+  owners: OpportunityOwner[]
+  people: Map<string, Profile>
+  me: string
+  isAdmin: boolean
+  onChange: () => Promise<void>
+}) {
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  async function add(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setNotice(null)
+    setBusy(true)
+    const typed = email.trim()
+    const { data: result, error: rpcError } = await supabase.rpc('admin_add_opportunity_owner', {
+      p_opportunity_id: opportunityId,
+      p_email: typed,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    setEmail('')
+    setNotice(
+      result === 'already'
+        ? `${typed} is already an owner.`
+        : result === 'added_poster'
+          ? `${typed} is now an owner. They were also made a poster so they can edit it.`
+          : `${typed} is now an owner.`,
+    )
+    await onChange()
+  }
+
+  async function remove(owner: OpportunityOwner) {
+    const name = owner.user_id === me ? 'yourself' : displayName(people.get(owner.user_id))
+    if (!window.confirm(`Remove ${name} as an owner? They will no longer be able to edit this post or see its names.`)) return
+    setError(null)
+    setNotice(null)
+    setBusy(true)
+    const { error: rpcError } = await supabase.rpc('admin_remove_opportunity_owner', {
+      p_opportunity_id: opportunityId,
+      p_user_id: owner.user_id,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    await onChange()
+  }
+
+  return (
+    <section className="panel stack owners-panel">
+      <h2 className="panel-title">Owners</h2>
+      {owners.length === 0 ? (
+        <p className="small muted">No owners yet. Only admins can edit this post.</p>
+      ) : (
+        <ul className="people">
+          {owners.map((o) => {
+            const person = people.get(o.user_id)
+            return (
+              <li key={o.user_id}>
+                {person && <Avatar person={person} size={30} />}
+                <span className="owner-name">
+                  {displayName(person)}
+                  {o.user_id === me && <span className="muted small"> (you)</span>}
+                </span>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="btn btn-link danger small"
+                    disabled={busy}
+                    onClick={() => void remove(o)}
+                    aria-label={`Remove ${displayName(person)} as an owner`}
+                  >
+                    Remove
+                  </button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {isAdmin ? (
+        <form className="stack-sm" onSubmit={(e) => void add(e)}>
+          <label className="field">
+            <span>Add an owner by work email</span>
+            <input
+              type="email"
+              required
+              placeholder="name@ems-wi.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <button className="btn btn-secondary" disabled={busy}>
+            <UserPlus size={15} aria-hidden="true" /> Add owner
+          </button>
+          <p className="small muted">
+            Owners can edit this post, see every name on it and email those people. They must have signed in to the
+            site at least once.
+          </p>
+        </form>
+      ) : (
+        <p className="small muted">Owners can edit this post and see every name on it. Ask an admin to add or remove owners.</p>
+      )}
+      {notice && <p className="notice">{notice}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
   )
 }
 
@@ -334,11 +492,13 @@ function PeopleList({
   rows,
   people,
   ordered,
+  linked,
 }: {
   title: string
   rows: Signup[]
   people: Map<string, Profile>
   ordered?: boolean
+  linked?: boolean
 }) {
   if (rows.length === 0 && title !== 'Committed' && title !== 'Interested') return null
   return (
@@ -357,7 +517,7 @@ function PeopleList({
                 {person && <Avatar person={person} size={30} />}
                 <span>
                   {ordered && <span className="muted">{i + 1}. </span>}
-                  {displayName(person)}
+                  {linked && person ? <a href={`mailto:${person.email}`}>{displayName(person)}</a> : displayName(person)}
                   {person?.position && <span className="muted small"> · {POSITION_LABELS[person.position]}</span>}
                 </span>
               </li>

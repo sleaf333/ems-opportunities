@@ -40,4 +40,4 @@ For a full local Supabase (database, sign-in and a test inbox at http://127.0.0.
 
 ## Changing the database after launch
 
-Never edit a migration that has already been run on the live project. Add a new numbered file (`0003_...sql`), test it with `npm run test:db` (which checks both upgrading an existing database and a fresh install), then run it in the Supabase SQL Editor (see "Applying a database update" in docs/SETUP.md).
+Never edit a migration that has already been run on the live project. Add a new numbered file (`0006_...sql`), test it with `npm run test:db` (which checks both upgrading an existing database and a fresh install), then run it in the Supabase SQL Editor (see "Applying a database update" in docs/SETUP.md).

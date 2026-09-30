@@ -18,6 +18,7 @@ export default function Layout() {
           <nav className="nav">
             <NavLink to="/" end>Opportunities</NavLink>
             <NavLink to="/mine">My sign-ups</NavLink>
+            {canPost && <NavLink to="/my-posts">My posts</NavLink>}
             {canPost && <NavLink to="/new">Post</NavLink>}
             {profile.role === 'admin' && <NavLink to="/admin/insights" className={({ isActive }) => (isActive || location.pathname === '/admin' ? 'active' : '')}>Admin</NavLink>}
             <NavLink to="/profile">Profile</NavLink>

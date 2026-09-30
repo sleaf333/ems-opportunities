@@ -86,6 +86,14 @@ export interface Opportunity {
   updated_at: string
 }
 
+// Owners can edit a post, see every name on it and email those people.
+export interface OpportunityOwner {
+  opportunity_id: string
+  user_id: string
+  added_by: string | null
+  added_at: string
+}
+
 export interface Signup {
   id: string
   opportunity_id: string

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import type { InterestCategory, Opportunity, OpportunityCategory, Profile, Signup, SignupCounts } from './types'
+import type {
+  InterestCategory,
+  Opportunity,
+  OpportunityCategory,
+  OpportunityOwner,
+  Profile,
+  Signup,
+  SignupCounts,
+} from './types'
 
 // The group is small (~150 people), so pages load whole tables and filter in
 // the browser. Row-level security still decides what each person receives.
@@ -27,6 +35,12 @@ export function fetchSignupsFor(opportunityId: string): Promise<Signup[]> {
   return unwrap(
     supabase.from('signups').select('*').eq('opportunity_id', opportunityId).order('status_changed_at'),
   )
+}
+
+// All owners, or the owners of one post.
+export function fetchOwners(opportunityId?: string): Promise<OpportunityOwner[]> {
+  const query = supabase.from('opportunity_owners').select('*').order('added_at')
+  return unwrap(opportunityId ? query.eq('opportunity_id', opportunityId) : query)
 }
 
 export function fetchProfiles(): Promise<Profile[]> {

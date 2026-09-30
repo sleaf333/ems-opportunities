@@ -177,7 +177,7 @@ set request.jwt.claim.sub = :'poster';
 set role authenticated;
 select public.set_opportunity_categories(:'fair_id', array[:'wellness_id', :'sim_id']::uuid[]);
 select tests.eq((select count(*)::text from public.opportunity_categories where opportunity_id = :'fair_id'), '1', 'poster sets topics; retired ones skipped');
-select tests.expect_error(format($$select public.set_opportunity_categories(%L, '{}')$$, :'finance_id'), 'Only the poster or an admin%');
+select tests.expect_error(format($$select public.set_opportunity_categories(%L, '{}')$$, :'finance_id'), 'Only the post''s owners or an admin%');
 reset role;
 
 -- Nobody can delete, not even admins.
@@ -370,6 +370,104 @@ update public.profiles set position = 'employed_physician' where id = :'partner'
 set request.jwt.claim.sub = :'partner';
 set role authenticated;
 select tests.eq(public.set_my_signup(:'finance_id', 'withdrawn')::text, 'withdrawn', 'ineligible can still withdraw');
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- Post owners (co-owners added by admins)
+-- ---------------------------------------------------------------------------
+
+\set owner2 'a0000000-0000-0000-0000-000000000009'
+insert into auth.users (id, email) values (:'owner2', 'cochair@ems-wi.com');
+update public.profiles set full_name = 'Co Chair', position = 'employed_physician' where id = :'owner2';
+
+select tests.eq((select string_agg(user_id::text, ',') from public.opportunity_owners where opportunity_id = :'fair_id'), :'poster', 'creator is the first owner');
+select tests.eq((select count(*)::text from public.opportunity_owners where opportunity_id = :'finance_id'), '0', 'seeded posts start with no owner');
+
+-- Only admins can add or remove owners, and nobody writes the table directly.
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+select tests.expect_error(format($$select public.admin_add_opportunity_owner(%L, 'cochair@ems-wi.com')$$, :'fair_id'), 'Only admins%');
+select tests.expect_error(format($$select public.admin_remove_opportunity_owner(%L, %L)$$, :'fair_id', :'poster'), 'Only admins%');
+select tests.expect_error(format($$insert into public.opportunity_owners (opportunity_id, user_id) values (%L, %L)$$, :'finance_id', :'poster'), 'permission denied%');
+select tests.expect_error(format($$delete from public.opportunity_owners where opportunity_id = %L$$, :'fair_id'), 'permission denied%');
+reset role;
+
+set request.jwt.claim.sub = :'owner2';
+set role authenticated;
+select tests.eq((select count(*)::text from public.signups where opportunity_id = :'fair_id'), '2', 'before: co-chair sees only active names (names on)');
+update public.opportunities set show_names = false where id = :'fair_id';
+reset role;
+select tests.eq((select show_names::text from public.opportunities where id = :'fair_id'), 'true', 'non-owner cannot edit');
+
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.expect_error(format($$select public.admin_add_opportunity_owner(%L, 'nobody@ems-wi.com')$$, :'fair_id'), 'This person has not signed in yet%');
+select tests.expect_error($$select public.admin_add_opportunity_owner(gen_random_uuid(), 'cochair@ems-wi.com')$$, 'Opportunity not found%');
+select tests.eq(public.admin_add_opportunity_owner(:'fair_id', ' CoChair@EMS-WI.com '), 'added_poster', 'admin adds a member as co-owner');
+select tests.eq(public.admin_add_opportunity_owner(:'fair_id', 'cochair@ems-wi.com'), 'already', 'adding twice is harmless');
+select tests.eq(public.admin_add_opportunity_owner(:'finance_id', 'boss@ems-wi.com'), 'added', 'admin adds an admin as owner');
+reset role;
+select tests.eq((select role::text from public.profiles where id = :'owner2'), 'poster', 'new owner became a poster');
+select tests.eq((select role::text from public.profiles where id = :'admin'), 'admin', 'admins stay admins');
+select tests.eq((select added_by::text from public.opportunity_owners where opportunity_id = :'fair_id' and user_id = :'owner2'), :'admin', 'who added the owner is recorded');
+
+-- A co-owner has the same powers as the creator.
+set request.jwt.claim.sub = :'owner2';
+set role authenticated;
+select tests.eq((select count(*)::text from public.signups where opportunity_id = :'fair_id'), '3', 'co-owner sees everyone, including withdrawals');
+update public.opportunities set show_names = false where id = :'fair_id';
+select tests.eq((select show_names::text from public.opportunities where id = :'fair_id'), 'false', 'co-owner edits the post');
+select public.set_opportunity_categories(:'fair_id', array[:'wellness_id']::uuid[]);
+select tests.eq((select public.is_opp_owner(:'fair_id')::text), 'true', 'co-owner is an owner');
+update public.opportunities set title = 'Changed' where id = :'finance_id';
+reset role;
+select tests.eq((select title from public.opportunities where id = :'finance_id'), 'Finance Committee', 'co-owner of one post cannot edit another');
+
+-- Co-owners see a draft they own.
+update public.opportunities set status = 'draft' where id = :'fair_id';
+set request.jwt.claim.sub = :'owner2';
+set role authenticated;
+select tests.eq((select count(*)::text from public.opportunities where id = :'fair_id'), '1', 'co-owner sees own draft');
+select tests.eq((select committed::text from public.opportunity_counts() where opportunity_id = :'fair_id'), '1', 'co-owner sees counts on own draft');
+reset role;
+set request.jwt.claim.sub = :'doc';
+set role authenticated;
+select tests.eq((select count(*)::text from public.opportunities where id = :'fair_id'), '0', 'others still cannot see the draft');
+reset role;
+update public.opportunities set status = 'open' where id = :'fair_id';
+
+-- Removing an owner takes the powers away (their role stays).
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_remove_opportunity_owner(:'fair_id', :'poster');
+reset role;
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+update public.opportunities set show_names = true where id = :'fair_id';
+select tests.expect_error(format($$select public.set_opportunity_categories(%L, '{}')$$, :'fair_id'), 'Only the post''s owners or an admin%');
+select tests.eq((select count(*)::text from public.signups where opportunity_id = :'fair_id'), '0', 'removed owner no longer sees names');
+reset role;
+select tests.eq((select show_names::text from public.opportunities where id = :'fair_id'), 'false', 'removed owner cannot edit');
+select tests.eq((select role::text from public.profiles where id = :'poster'), 'poster', 'removed owner keeps their role');
+
+-- A member demoted by an admin keeps ownership but cannot edit until a poster again.
+update public.profiles set role = 'member' where id = :'owner2';
+set request.jwt.claim.sub = :'owner2';
+set role authenticated;
+update public.opportunities set show_names = true where id = :'fair_id';
+reset role;
+select tests.eq((select show_names::text from public.opportunities where id = :'fair_id'), 'false', 'owners must be posters to edit');
+update public.profiles set role = 'poster' where id = :'owner2';
+
+-- New posts: the creator becomes owner automatically.
+set request.jwt.claim.sub = :'owner2';
+set role authenticated;
+insert into public.opportunities (title, region) values ('Co-chair event', 'fox_valley');
+select tests.eq((select count(*)::text from public.opportunity_owners o join public.opportunities p on p.id = o.opportunity_id where p.title = 'Co-chair event' and o.user_id = auth.uid()), '1', 'new post owned by its creator');
+reset role;
+
+set role anon;
+select tests.expect_error('select * from public.opportunity_owners', 'permission denied%');
 reset role;
 
 \o

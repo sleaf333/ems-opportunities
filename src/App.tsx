@@ -6,6 +6,7 @@ import Admin from './pages/Admin'
 import CompleteProfile from './pages/CompleteProfile'
 import Insights from './pages/Insights'
 import Login from './pages/Login'
+import MyPosts from './pages/MyPosts'
 import MySignups from './pages/MySignups'
 import NotFound from './pages/NotFound'
 import OpportunityDetail from './pages/OpportunityDetail'
@@ -51,6 +52,7 @@ function Gate() {
         <Route path="o/:id/edit" element={<OpportunityForm key="edit" />} />
         <Route path="new" element={<OpportunityForm key="new" />} />
         <Route path="mine" element={<MySignups />} />
+        <Route path="my-posts" element={<MyPosts />} />
         <Route path="profile" element={<Profile />} />
         <Route path="admin" element={<Admin />} />
         <Route path="admin/insights" element={<Insights />} />
