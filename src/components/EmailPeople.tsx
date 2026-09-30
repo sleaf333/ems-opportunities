@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Copy, Mail } from 'lucide-react'
-import { bccMailto, pasteList } from '../lib/email'
+import { Copy, ExternalLink, Mail } from 'lucide-react'
+import { bccMailto, outlookWebCompose, pasteList, uniqueEmails } from '../lib/email'
 import type { Profile } from '../lib/types'
 
 export interface EmailGroup {
@@ -8,20 +8,24 @@ export interface EmailGroup {
   people: Profile[]
 }
 
-// "Email everyone", one link per group, and a copy button for when a mail
-// app will not open (or the list is too long for a link).
+// One row per group (Committed, Waitlist, Interested, and Everyone when there
+// is more than one group): Copy puts the addresses on the clipboard for
+// pasting into Bcc (works with Outlook on the web), Email opens the
+// computer's default mail app. "Open Outlook on the web" starts a new message.
 export default function EmailPeople({ subject, groups }: { subject: string; groups: EmailGroup[] }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
   const filled = groups.filter((g) => g.people.length > 0)
-  const everyone = filled.flatMap((g) => g.people.map((p) => p.email))
-  if (everyone.length === 0) return null
+  if (filled.length === 0) return null
 
-  async function copy() {
-    const text = pasteList(everyone)
+  const rows = filled.map((g) => ({ label: g.label, emails: uniqueEmails(g.people.map((p) => p.email)) }))
+  if (rows.length > 1) rows.push({ label: 'Everyone', emails: uniqueEmails(rows.flatMap((r) => r.emails)) })
+
+  async function copy(label: string, emails: string[]) {
+    const text = pasteList(emails)
     try {
       await navigator.clipboard.writeText(text)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 2500)
+      setCopied(label)
+      window.setTimeout(() => setCopied((c) => (c === label ? null : c)), 2500)
     } catch {
       window.prompt('Copy these addresses, then paste them into Bcc:', text)
     }
@@ -29,19 +33,33 @@ export default function EmailPeople({ subject, groups }: { subject: string; grou
 
   return (
     <div className="email-people">
-      <a className="btn btn-secondary btn-small" href={bccMailto(everyone, subject)}>
-        <Mail size={15} aria-hidden="true" /> Email everyone ({new Set(everyone.map((e) => e.toLowerCase())).size})
-      </a>
-      {filled.length > 1 &&
-        filled.map((g) => (
-          <a key={g.label} className="btn btn-link" href={bccMailto(g.people.map((p) => p.email), subject)}>
-            Email {g.label.toLowerCase()} ({g.people.length})
-          </a>
+      <ul className="email-rows">
+        {rows.map((r) => (
+          <li key={r.label}>
+            <span className="email-row-label">
+              {r.label} <span className="count">{r.emails.length}</span>
+            </span>
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={() => void copy(r.label, r.emails)}
+              aria-label={`Copy ${r.label.toLowerCase()} emails`}
+            >
+              <Copy size={14} aria-hidden="true" /> {copied === r.label ? 'Copied' : 'Copy'}
+            </button>
+            <a className="btn btn-link small" href={bccMailto(r.emails, subject)} aria-label={`Email ${r.label.toLowerCase()}`}>
+              <Mail size={14} aria-hidden="true" /> Email
+            </a>
+          </li>
         ))}
-      <button type="button" className="btn btn-link" onClick={() => void copy()}>
-        <Copy size={14} aria-hidden="true" /> {copied ? 'Copied' : 'Copy emails'}
-      </button>
-      <span className="visually-hidden" role="status">{copied ? 'Email addresses copied' : ''}</span>
+      </ul>
+      <div className="email-web">
+        <a className="btn btn-link small" href={outlookWebCompose(subject)} target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={14} aria-hidden="true" /> Open Outlook on the web
+        </a>
+        <span className="small muted">Copy a group, then paste into the Bcc line.</span>
+      </div>
+      <span className="visually-hidden" role="status">{copied ? `${copied} emails copied` : ''}</span>
     </div>
   )
 }

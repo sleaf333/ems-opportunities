@@ -1761,10 +1761,36 @@ tr.expanded td {
   border-top: 1px solid var(--hairline);
 }
 .email-people {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 0.5rem;
+  flex: 1 1 100%;
+}
+.email-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.email-rows li {
+  display: grid;
+  grid-template-columns: 7.5rem auto auto;
+  justify-content: start;
   align-items: center;
-  gap: 0.25rem 0.5rem;
+  gap: 0.4rem;
+}
+.email-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.email-web {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
 }
 .mypost-names {
   display: grid;
