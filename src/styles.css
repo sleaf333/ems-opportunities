@@ -927,6 +927,9 @@ input[type='checkbox'] {
 .opp-admin_staff {
   --accent: var(--dot-4);
 }
+.opp-apc {
+  --accent: var(--logo-blue);
+}
 
 .opp {
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);

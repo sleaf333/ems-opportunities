@@ -349,6 +349,22 @@ select tests.eq(public.set_my_signup(:'wellness_opp_id', 'interested')::text, 'i
 select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'trauma_id'), 'This opportunity is not open to your position%');
 reset role;
 
+-- APCs-only posts: APCs yes; no physician position, including shareholders.
+insert into public.opportunities (title, region, eligible_positions) values ('APC skills lab', 'milwaukee', '{apc}');
+select id as apc_only_id from public.opportunities where title = 'APC skills lab' \gset
+set request.jwt.claim.sub = :'apc';
+set role authenticated;
+select tests.eq(public.set_my_signup(:'apc_only_id', 'committed')::text, 'committed', 'APC joins APC-only post');
+reset role;
+set request.jwt.claim.sub = :'doc';
+set role authenticated;
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'apc_only_id'), 'This opportunity is not open to your position%');
+reset role;
+set request.jwt.claim.sub = :'partner';
+set role authenticated;
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'apc_only_id'), 'This opportunity is not open to your position%');
+reset role;
+
 -- Changing position does not trap anyone: they can still withdraw.
 update public.profiles set position = 'employed_physician' where id = :'partner';
 set request.jwt.claim.sub = :'partner';
