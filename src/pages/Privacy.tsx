@@ -33,11 +33,11 @@ export default function Privacy() {
         <ul>
           <li>
             <strong>Everyone signed in</strong> sees how many people have signed up for each opportunity. They see
-            names only if the person who posted it chooses to show them.
+            names only if the post's owners choose to show them.
           </li>
           <li>
-            <strong>The person who posted an opportunity</strong> sees who signed up for it, including anyone who
-            withdrew.
+            <strong>The owners of an opportunity</strong> (whoever posted it, plus anyone an admin adds) see who
+            signed up for it, including anyone who withdrew, and can email them.
           </li>
           <li>
             <strong>Admins</strong> see everything, including the full history, interests and leadership goals, and can

@@ -64,6 +64,8 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 - [x] Nobody can delete an opportunity through the site; close or archive instead
 - [x] Names of who signed up: admins and the poster always; members only when the poster turns on "Show names to members" (off by default); counts are always shown
 - [x] Curated topic list shared by opportunities and member interests, managed by admins; members add write-in interests; admins see who is interested in each topic and can email them
+- [x] Several owners per post (co-chairs): whoever posts it is the first owner; admins add or remove owners by email on the post page (the person must have signed in once; members are made posters). Owners edit the post and see every name
+- [x] "My posts" page for posters and admins: every post they own, with counts, names, and email buttons (everyone, per group, or copy the addresses)
 
 ### Phase 2: Engagement dashboard
 - [ ] Posters mark attendance or completion (in bulk: "everyone attended" with exceptions)
@@ -174,3 +176,5 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-28 | Administrative staff join only administrative-staff posts and posts open to everyone; the brochure's "All Team Members" committees are open to everyone, including administrative staff |
 | 2026-09-28 | Add an admin Insights page to spot rising leaders and unmet interest; computed in the browser from existing data, no database change. Attendance marking deferred |
 | 2026-09-30 | Add an "APCs only" preset and section; some posts are intentionally closed to all physician positions |
+| 2026-09-30 | Posts can have several owners (for co-chairs), added and removed only by admins, by email, after the person has signed in once. Adding a plain member makes them a poster; removing an owner leaves their role alone. The seeded committees start with no owner |
+| 2026-09-30 | "My posts" menu item for posters and admins, with group email links (Bcc) and a copy-addresses fallback for long lists |

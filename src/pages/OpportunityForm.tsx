@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
-import { categoriesByOpportunity, fetchCategories, fetchOpportunity, fetchOpportunityCategories } from '../lib/data'
+import { categoriesByOpportunity, fetchCategories, fetchOpportunity, fetchOpportunityCategories, fetchOwners } from '../lib/data'
 import {
   addDays,
   ALL_POSITIONS,
@@ -117,6 +117,7 @@ export default function OpportunityForm() {
   const [categories, setCategories] = useState<InterestCategory[]>([])
   const [picked, setPicked] = useState<string[]>([])
   const [original, setOriginal] = useState<Opportunity | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -131,29 +132,38 @@ export default function OpportunityForm() {
         .catch((err: Error) => setLoadError(err.message))
       return
     }
-    Promise.all([fetchOpportunity(id), fetchCategories(), fetchOpportunityCategories()])
-      .then(([opp, cats, links]) => {
+    Promise.all([fetchOpportunity(id), fetchCategories(), fetchOpportunityCategories(), fetchOwners(id)])
+      .then(([opp, cats, links, owners]) => {
         if (!opp) {
           setLoadError('This opportunity does not exist.')
           return
         }
         setOriginal(opp)
+        setIsOwner(owners.some((o) => o.user_id === profile.id))
         setCategories(cats)
         setForm(fromOpportunity(opp))
         setPicked((categoriesByOpportunity(links, cats).get(id) ?? []).map((c) => c.id))
       })
       .catch((err: Error) => setLoadError(err.message))
-  }, [id, presetTopic])
+  }, [id, presetTopic, profile.id])
 
   const canPost = profile.role === 'poster' || profile.role === 'admin'
   const canEdit =
-    profile.role === 'admin' || (profile.role === 'poster' && (!original || original.created_by === profile.id))
+    profile.role === 'admin' || (profile.role === 'poster' && (!original || isOwner))
 
-  if (!canPost || (editing && original && !canEdit)) {
+  if (!canPost) {
     return (
       <div className="card">
         <h1>Posting not available</h1>
         <p>An admin needs to approve you as a poster first.</p>
+      </div>
+    )
+  }
+  if (editing && original && !canEdit) {
+    return (
+      <div className="card">
+        <h1>Editing not available</h1>
+        <p>Only this post's owners and admins can edit it. Ask an admin to add you as an owner.</p>
       </div>
     )
   }

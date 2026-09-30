@@ -31,4 +31,10 @@ select tests.eq((select leadership_goals from public.member_interests where user
 select tests.eq((select count(*)::text from public.signups where status = 'committed'), '1', 'sign-ups kept');
 select tests.eq((select count(*)::text from public.signup_events), '1', 'history kept');
 
+select tests.eq(
+  (select string_agg(p.title, ',') from public.opportunity_owners o join public.opportunities p on p.id = o.opportunity_id
+   where o.user_id = 'b0000000-0000-0000-0000-000000000001'),
+  'Trauma', 'existing posts: creator became owner');
+select tests.eq((select count(*)::text from public.opportunity_owners), '1', 'posts without a creator have no owner');
+
 \o

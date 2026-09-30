@@ -134,7 +134,7 @@ Check current prices before buying; they change.
 
 ## Applying a database update
 
-When a change needs a new file in `supabase/migrations` (for example `0002_...sql`), it will say so in the pull request. To apply it:
+When a change needs a new file in `supabase/migrations` (for example `0005_...sql`), it will say so in the pull request. To apply it:
 
 1. In Supabase, open **SQL Editor**, then **New query**.
 2. Paste the whole new file and click **Run**. Run each new file once, in number order. Never re-run an older one.

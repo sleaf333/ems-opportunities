@@ -26,6 +26,8 @@ update public.member_interests
 set interests = '{wellness,Simulation,peer support}', leadership_goals = 'Lead wellness'
 where user_id = 'b0000000-0000-0000-0000-000000000002';
 
+update public.opportunities set created_by = 'b0000000-0000-0000-0000-000000000001' where title = 'Trauma';
+
 insert into public.signups (opportunity_id, user_id, status)
 select id, 'b0000000-0000-0000-0000-000000000005', 'committed'
 from public.opportunities where title = 'Finance Committee';
