@@ -57,6 +57,7 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 
 ### Phase 1.5: Second round (built)
 - [x] Positions: Employed physician, Shareholder track, Shareholder, APC, Administrative staff
+- [x] "APCs only" preset and main-page section for posts that intentionally exclude physicians
 - [x] The separate shareholder checkbox became a Shareholder position (self-selected since 0003; admins can correct it)
 - [x] Required location (Door County, Fox Valley, Milwaukee, Watertown, Group-wide), optional hospital/site, meeting format, and a location filter
 - [x] "Show on site until" date, separate from the activity dates: committees default to indefinitely, other posts to 180 days; expired posts leave the list but are never deleted; admins see posts ending soon and expired posts
@@ -172,3 +173,4 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-28 | Shareholder-track posts are open to shareholder track and shareholders; employed physicians cannot join shareholder or shareholder-track posts |
 | 2026-09-28 | Administrative staff join only administrative-staff posts and posts open to everyone; the brochure's "All Team Members" committees are open to everyone, including administrative staff |
 | 2026-09-28 | Add an admin Insights page to spot rising leaders and unmet interest; computed in the browser from existing data, no database change. Attendance marking deferred |
+| 2026-09-30 | Add an "APCs only" preset and section; some posts are intentionally closed to all physician positions |

@@ -38,6 +38,7 @@ import {
   displayName,
   eligibilityGroup,
   eligibilityLabel,
+  eligibilityPhrase,
   FORMAT_LABELS,
   formatDate,
   isExpired,
@@ -265,7 +266,7 @@ export default function OpportunityDetail() {
                 )}
                 {!eligible && (
                   <p className="small muted">
-                    This is open to {whoLabel.toLowerCase()} only. You can view it for future reference.
+                    This is open to {eligibilityPhrase(opp.eligible_positions)} only. You can view it for future reference.
                   </p>
                 )}
                 {eligible && !isOpen && (

@@ -134,6 +134,7 @@ export const ELIGIBILITY_GROUPS: { key: string; title: string; label: string; po
     label: 'Physicians',
     positions: ['employed_physician', 'partnership_track', 'partner'],
   },
+  { key: 'apc', title: 'For APCs', label: 'APCs', positions: ['apc'] },
   {
     key: 'track',
     title: 'Shareholder track and shareholders',
@@ -150,6 +151,14 @@ function samePositions(a: MemberPosition[], b: MemberPosition[]): boolean {
 
 export function eligibilityGroup(positions: MemberPosition[]): string {
   return ELIGIBILITY_GROUPS.find((g) => samePositions(g.positions, positions))?.key ?? 'custom'
+}
+
+// For use mid-sentence ("open to physicians only"); keeps "APC" capitalized.
+export function eligibilityPhrase(positions: MemberPosition[]): string {
+  return eligibilityLabel(positions)
+    .split(' ')
+    .map((w) => (/^APCs?,?$/.test(w) ? w : w.toLowerCase()))
+    .join(' ')
 }
 
 export function eligibilityLabel(positions: MemberPosition[]): string {
