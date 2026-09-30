@@ -470,4 +470,115 @@ set role anon;
 select tests.expect_error('select * from public.opportunity_owners', 'permission denied%');
 reset role;
 
+-- ---------------------------------------------------------------------------
+-- Safety net (0006): edit history, role log, backups, blocked cascades
+-- ---------------------------------------------------------------------------
+
+-- Edit history keeps the changed fields and old values; no-op saves add nothing.
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+update public.opportunities set site = 'Froedtert Main' where id = :'fair_id';
+update public.opportunities set site = 'Froedtert Main' where id = :'fair_id';
+reset role;
+select tests.eq(
+  (select count(*)::text from public.opportunity_history where opportunity_id = :'fair_id' and changed_fields = '{site}'),
+  '1', 'edit saved to history once; unchanged saves skipped');
+select tests.eq(
+  (select (old_values ->> 'site') || ' by ' || changed_by from public.opportunity_history where opportunity_id = :'fair_id' and changed_fields = '{site}'),
+  'Froedtert by ' || :'admin', 'history keeps the old value and who changed it');
+
+-- Role changes are logged, including roles set in advance by an admin.
+select tests.eq((select new_role || ' by ' || changed_by from public.role_changes where user_id = :'future'), 'poster by ' || :'admin', 'preset role logged with the admin who set it');
+select tests.eq(
+  (select old_role || '>' || new_role || ' by ' || changed_by from public.role_changes where user_id = :'poster' order by id limit 1),
+  'member>poster by ' || :'admin', 'role change logged with the admin who made it');
+select tests.eq((select count(*)::text from public.role_changes where user_id = :'owner2'), '3', 'owner promotion and later changes logged');
+
+-- Something private to find, then check non-admins cannot find it.
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_member('later@ems-wi.com', 'poster', false);
+reset role;
+
+set request.jwt.claim.sub = :'doc';
+set role authenticated;
+select tests.eq((select count(*)::text from public.member_presets), '0', 'member: no presets');
+select tests.eq((select count(*)::text from public.member_interests where user_id <> auth.uid()), '0', 'member: no one else''s interests or goals');
+select tests.eq((select count(*)::text from public.member_interest_categories where user_id <> auth.uid()), '0', 'member: no one else''s topics');
+select tests.eq((select count(*)::text from public.signup_events where user_id <> auth.uid()), '0', 'member: no one else''s history');
+select tests.eq((select count(*)::text from public.opportunity_history), '0', 'member: no edit history');
+select tests.eq((select count(*)::text from public.role_changes), '0', 'member: no role log');
+select tests.eq((select count(*)::text from public.backup_log), '0', 'member: no backup log');
+select tests.expect_error('select public.admin_export_all()', 'Only admins can download a full backup%');
+select tests.expect_error($$select public.erase_member_permanently('doc@ems-wi.com')$$, 'permission denied%');
+select tests.expect_error(format($$select public.erase_opportunity_permanently(%L)$$, :'fair_id'), 'permission denied%');
+select tests.expect_error(format($$insert into public.opportunity_history (opportunity_id, changed_fields, old_values) values (%L, '{}', '{}')$$, :'fair_id'), 'permission denied%');
+select tests.expect_error($$insert into public.backup_log (downloaded_by) values (auth.uid())$$, 'permission denied%');
+reset role;
+
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+select tests.eq((select count(*)::text from public.member_presets), '0', 'poster: no presets');
+select tests.eq((select count(*)::text from public.member_interests where user_id <> auth.uid()), '0', 'poster: no one else''s interests or goals');
+select tests.eq((select count(*)::text from public.signup_events where user_id <> auth.uid()), '0', 'poster: no one else''s history');
+select tests.eq((select count(*)::text from public.opportunity_history), '0', 'poster: no edit history');
+select tests.eq((select count(*)::text from public.role_changes), '0', 'poster: no role log');
+select tests.expect_error('select public.admin_export_all()', 'Only admins can download a full backup%');
+reset role;
+
+set role anon;
+select tests.expect_error('select * from public.opportunity_history', 'permission denied%');
+select tests.expect_error('select public.admin_export_all()', 'permission denied%');
+reset role;
+
+-- Full backup: every table, recorded in the log.
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.eq(
+  (select string_agg(k, ',' order by k) from jsonb_object_keys(public.admin_export_all()) k),
+  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,opportunities,opportunity_categories,opportunity_history,opportunity_owners,profiles,role_changes,schema_version,signup_events,signups',
+  'backup has every table');
+select tests.eq(
+  (select jsonb_array_length(public.admin_export_all() -> 'signup_events')::text),
+  (select count(*)::text from public.signup_events), 'backup has every history row');
+select tests.eq((select count(*)::text from public.backup_log where downloaded_by = auth.uid()), '2', 'each backup download is logged');
+reset role;
+-- If this fails, a new table was added: put it in admin_export_all.
+select tests.eq(
+  (select count(*)::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'),
+  '13', 'backup covers every table in the database');
+
+-- Deleting people or posts with activity is blocked (as the Supabase dashboard would).
+select tests.expect_error(format($$delete from auth.users where id = %L$$, :'doc'), '%violates foreign key constraint%');
+select tests.eq((select count(*)::text from public.profiles where id = :'doc'), '1', 'member with history survives Delete user');
+select tests.expect_error(format($$delete from public.opportunities where id = %L$$, :'fair_id'), '%violates foreign key constraint%');
+select tests.expect_error($$delete from public.signups$$, '%violates foreign key constraint%');
+delete from auth.users where id = :'newbie';
+select tests.eq((select count(*)::text from public.profiles where id = :'newbie'), '0', 'member with no activity can still be deleted');
+delete from public.opportunities where title = 'Co-chair event';
+select tests.eq((select count(*)::text from public.opportunities where title = 'Co-chair event'), '0', 'post with no activity can still be deleted');
+
+-- Deliberate erase: everything goes, and the waitlist moves up.
+insert into public.opportunities (title, region, capacity) values ('Erase test', 'milwaukee', 1);
+select id as erase_id from public.opportunities where title = 'Erase test' \gset
+set request.jwt.claim.sub = :'apc';
+set role authenticated;
+select public.set_my_signup(:'erase_id', 'committed');
+reset role;
+set request.jwt.claim.sub = :'staffer';
+set role authenticated;
+select tests.eq(public.set_my_signup(:'erase_id', 'committed')::text, 'waitlisted', 'second in line is waitlisted');
+reset role;
+select tests.eq(left(public.erase_member_permanently(' APC@ems-wi.com '), 30), 'Erased apc@ems-wi.com and thei', 'erase member reports what it did');
+select tests.eq((select count(*)::text from public.profiles where id = :'apc'), '0', 'erased member is gone');
+select tests.eq((select count(*)::text from public.signups where user_id = :'apc'), '0', 'erased member''s sign-ups are gone');
+select tests.eq((select count(*)::text from public.signup_events where user_id = :'apc'), '0', 'erased member''s history is gone');
+select tests.eq((select status::text from public.signups where user_id = :'staffer' and opportunity_id = :'erase_id'), 'committed', 'waitlist moves up after erase');
+select tests.expect_error($$select public.erase_member_permanently('nobody@ems-wi.com')$$, 'No member with the email%');
+
+select tests.eq(left(public.erase_opportunity_permanently(:'fair_id'), 8), 'Erased "', 'erase post reports what it did');
+select tests.eq((select count(*)::text from public.opportunities where id = :'fair_id'), '0', 'erased post is gone');
+select tests.eq((select count(*)::text from public.opportunity_history where opportunity_id = :'fair_id'), '0', 'erased post''s history is gone');
+select tests.eq((select count(*)::text from public.signup_events where opportunity_id = :'fair_id'), '0', 'erased post''s sign-up history is gone');
+
 \o

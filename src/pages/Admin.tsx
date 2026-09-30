@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { Mail } from 'lucide-react'
+import { Download, Mail } from 'lucide-react'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import AdminTabs from '../components/AdminTabs'
 import { type AdminData, BLANK_ENGAGEMENT, type Engagement, engagementByPerson, loadAdminData } from '../lib/adminData'
 import { byId, useLoader } from '../lib/data'
-import { downloadCsv, toCsv } from '../lib/csv'
+import { downloadCsv, downloadJson, toCsv } from '../lib/csv'
 import {
   COMMITMENT_LABELS,
   daysUntil,
@@ -13,6 +13,7 @@ import {
   eligibilityLabel,
   FORMAT_LABELS,
   formatDate,
+  formatDateTime,
   isExpired,
   localToday,
   POSITION_LABELS,
@@ -68,6 +69,7 @@ export default function Admin() {
         </div>
       </div>
 
+      <FullBackup data={data} reload={reload} />
       <PostingWindows opportunities={data.opportunities} />
       <MemberRoles data={data} reload={reload} draft={roleDraft} />
       <Interests data={data} />
@@ -81,6 +83,59 @@ export default function Admin() {
         }}
       />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+// Remind admins to keep a monthly copy off Supabase (the free plan has no
+// restorable backups). Every download is recorded in the database.
+const BACKUP_REMINDER_DAYS = 30
+
+function FullBackup({ data, reload }: { data: AdminData; reload: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const last = data.lastBackup
+  const days = last ? Math.floor((Date.now() - Date.parse(last.downloaded_at)) / 86_400_000) : null
+  const overdue = days === null || days > BACKUP_REMINDER_DAYS
+  const by = last?.downloaded_by ? displayName(data.profiles.find((p) => p.id === last.downloaded_by)) : 'a former admin'
+
+  async function download() {
+    setBusy(true)
+    setError(null)
+    const { data: dump, error: rpcError } = await supabase.rpc('admin_export_all')
+    setBusy(false)
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    downloadJson(`ems-opportunities-backup-${localToday()}.json`, dump)
+    await reload()
+  }
+
+  return (
+    <section id="backup" className="card stack">
+      <div className="row between wrap gap-sm">
+        <div className="backup-text">
+          <h2>Full backup</h2>
+          <p className="small muted">
+            One file with everything on the site: members, interests and goals, posts, owners, sign-ups and all
+            history. It contains private information, so save it to the group's OneDrive or SharePoint, never to
+            personal email or a personal drive. Only admins can download it, and each download is recorded.
+          </p>
+        </div>
+        <button className="btn btn-primary" disabled={busy} onClick={() => void download()}>
+          <Download size={16} aria-hidden="true" /> {busy ? 'Preparing…' : 'Download full backup'}
+        </button>
+      </div>
+      <p className={overdue ? 'warning' : 'small muted'}>
+        {last
+          ? `Last full backup: ${formatDateTime(last.downloaded_at)}, by ${by}.` +
+            (overdue ? ` That was ${days} days ago; time for a new one.` : '')
+          : 'No full backup has been downloaded yet. Download one now, then once a month.'}
+      </p>
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
   )
 }
 
@@ -282,6 +337,34 @@ function MemberRoles({
                 </span>
               </li>
             ))}
+          </ul>
+        </div>
+      )}
+
+      {data.recentRoleChanges.length > 0 && (
+        <div>
+          <h3>Recent role changes</h3>
+          <ul className="list">
+            {data.recentRoleChanges.map((c) => {
+              const person = data.profiles.find((p) => p.id === c.user_id)
+              const by = c.changed_by ? data.profiles.find((p) => p.id === c.changed_by) : undefined
+              return (
+                <li key={c.id} className="row between wrap gap-sm">
+                  <span>
+                    {displayName(person)}: {c.old_role ? `${ROLE_LABELS[c.old_role]} to ` : ''}
+                    {ROLE_LABELS[c.new_role]}
+                  </span>
+                  <span className="small muted">
+                    {c.changed_by
+                      ? `by ${displayName(by)}`
+                      : c.old_role
+                        ? 'in the Supabase dashboard'
+                        : 'set before first sign-in'}
+                    {' · '}{formatDateTime(c.changed_at)}
+                  </span>
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
@@ -621,7 +704,7 @@ function Members({
         </div>
       </div>
       <p className="small muted">
-        Exports open in Excel. Download all four once a month and save them to the group's OneDrive as a backup.
+        Exports open in Excel for reading and sorting. For a complete backup, use Full backup at the top of this page.
       </p>
       <div className="filters filters-4">
         <input

@@ -16,7 +16,14 @@ export function toCsv(headers: string[], rows: Cell[][]): string {
 
 export function downloadCsv(filename: string, csv: string): void {
   // The byte-order mark makes Excel read accented names correctly.
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  downloadBlob(filename, new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
+}
+
+export function downloadJson(filename: string, value: unknown): void {
+  downloadBlob(filename, new Blob([JSON.stringify(value, null, 1)], { type: 'application/json' }))
+}
+
+function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

@@ -194,3 +194,50 @@ export function displayName(profile: Pick<Profile, 'full_name' | 'email'> | unde
   if (!profile) return 'Unknown'
   return profile.full_name.trim() || profile.email
 }
+
+// Edit history: what each post field is called on the form, and how an old
+// value reads (so "region: fox_valley" shows as "Location: Fox Valley").
+export const FIELD_LABELS: Record<string, string> = {
+  title: 'Title',
+  type: 'Type',
+  description: 'Description',
+  commitment: 'Time commitment',
+  time_estimate: 'Time needed',
+  eligible_positions: 'Who can sign up',
+  capacity: 'Spots',
+  start_date: 'Start date',
+  end_date: 'End date',
+  signup_deadline: 'Sign up by',
+  new_hire_friendly: 'Good for new hires',
+  region: 'Location',
+  site: 'Hospital or site',
+  format: 'Format',
+  visible_until: 'Show on site until',
+  show_names: 'Names shown to members',
+  contact_name: 'Contact name',
+  contact_email: 'Contact email',
+  status: 'Status',
+}
+
+export function fieldLabel(field: string): string {
+  return FIELD_LABELS[field] ?? field
+}
+
+export function describeOldValue(field: string, value: unknown): string {
+  if (field === 'visible_until' && value === null) return 'Indefinitely'
+  if (field === 'capacity' && value === null) return 'No limit'
+  if (value === null || value === undefined || value === '') return '(empty)'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (field === 'eligible_positions' && Array.isArray(value)) return eligibilityLabel(value as MemberPosition[])
+  const text = String(value)
+  const labels: Record<string, Record<string, string>> = {
+    type: TYPE_LABELS,
+    commitment: COMMITMENT_LABELS,
+    region: REGION_LABELS,
+    format: FORMAT_LABELS,
+    status: STATUS_LABELS,
+  }
+  if (labels[field]) return labels[field][text] ?? text
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return formatDate(text)
+  return text
+}

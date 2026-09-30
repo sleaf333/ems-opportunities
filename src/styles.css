@@ -1792,3 +1792,27 @@ tr.expanded td {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Admin: full backup and edit history */
+.backup-text {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+.history-old {
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.history-old dt {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.history-old dd {
+  margin: 0.15rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

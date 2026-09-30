@@ -114,7 +114,35 @@ From now on, every change merged into `main` on GitHub redeploys the site automa
 
 ## Monthly: back up the data
 
-The free Supabase plan does not include automatic backups. Once a month, on the **Admin** page, click the four **Export** buttons and save the files to the group's OneDrive.
+The free Supabase plan does not include backups you can restore. Once a month, on **Admin > Manage**, click **Download full backup** and save the file to the group's OneDrive or SharePoint (never personal email or a personal drive: it contains names, emails, interests and leadership goals). The box turns yellow when the last backup is more than 30 days old. Only admins can download it, and every download is recorded.
+
+## Safety and accidental deletes
+
+What protects the data:
+
+- **The website cannot delete anything.** No one, admins included, can delete a post, topic, sign-up or history through the site. Posts are closed, archived or expire instead.
+- **Supabase blocks deletes that would erase history.** In the Supabase dashboard, **Authentication > Delete user** fails with "Database error deleting user" if that person has any sign-ups, history or picked topics. Deleting a post that has sign-ups or edit history fails the same way. That error is the safety net working, not a problem. People and posts with no activity delete normally.
+- **Every post edit is kept.** Admins see **Edit history** at the bottom of each post, with the old values, and can copy them back with **Edit**.
+- **Role changes are logged.** **Admin > Manage > Roles** lists the last 10 (who became a poster or admin, and who did it).
+
+When someone leaves the group, do nothing on the site: once IT disables their email they cannot get a sign-in code. Their history stays for the records.
+
+If you truly must remove a person or a post permanently (for example a test account, or someone asks to be erased), run one of these in **SQL Editor**. This cannot be undone, so download a full backup first:
+
+```sql
+select public.erase_member_permanently('name@ems-wi.com');
+select public.erase_opportunity_permanently('paste-the-post-id-here');
+```
+
+A post's id is the long code at the end of its web address (after `/o/`). The website can never run these.
+
+What the safety net cannot stop: someone with access to the Supabase dashboard running destructive SQL or deleting the whole project. Guard against that with this checklist:
+
+- [ ] Two-step sign-in (2FA) on Supabase, GitHub, Cloudflare and Brevo.
+- [ ] A second trusted person (ideally IT) added to Supabase, GitHub and Cloudflare, so the group is never locked out.
+- [ ] Keep the admin role to a few people. Admins can see and export everything; make others posters instead.
+- [ ] Never use **Delete user** in Supabase.
+- [ ] Once the group relies on the site, move to Supabase Pro for automatic daily backups (see below).
 
 ## If the site stops loading data
 
@@ -140,4 +168,4 @@ When a change needs a new file in `supabase/migrations` (for example `0005_...sq
 2. Paste the whole new file and click **Run**. Run each new file once, in number order. Never re-run an older one.
 3. Right after that, merge the pull request so Cloudflare publishes the matching website. The site may show errors for the minute or two in between.
 
-Download the four Admin exports first if there is data you would hate to lose.
+Download a full backup (**Admin > Manage**) first if there is data you would hate to lose.

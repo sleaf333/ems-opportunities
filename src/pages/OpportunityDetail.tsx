@@ -38,12 +38,15 @@ import {
   canSignUp,
   COMMITMENT_LABELS,
   deadlinePassed,
+  describeOldValue,
   displayName,
   eligibilityGroup,
   eligibilityLabel,
   eligibilityPhrase,
+  fieldLabel,
   FORMAT_LABELS,
   formatDate,
+  formatDateTime,
   isExpired,
   locationText,
   POSITION_LABELS,
@@ -51,7 +54,7 @@ import {
   TYPE_LABELS,
 } from '../lib/format'
 import { friendlyError, supabase } from '../lib/supabase'
-import type { OpportunityOwner, Profile, Signup, SignupStatus } from '../lib/types'
+import type { OpportunityChange, OpportunityOwner, Profile, Signup, SignupStatus } from '../lib/types'
 
 export default function OpportunityDetail() {
   const { id = '' } = useParams()
@@ -67,8 +70,19 @@ export default function OpportunityDetail() {
       fetchOwners(id),
     ])
     const topics = categoriesByOpportunity(links, categories).get(id) ?? []
-    return [opp, signups, profiles, counts.get(id), topics, owners] as const
-  }, [id])
+    // Edit history is admin-only (the database returns nothing to anyone else).
+    let history: OpportunityChange[] = []
+    if (profile.role === 'admin') {
+      const result = await supabase
+        .from('opportunity_history')
+        .select('*')
+        .eq('opportunity_id', id)
+        .order('id', { ascending: false })
+      if (result.error) throw new Error(result.error.message)
+      history = result.data as OpportunityChange[]
+    }
+    return [opp, signups, profiles, counts.get(id), topics, owners, history] as const
+  }, [id, profile.role])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -77,7 +91,7 @@ export default function OpportunityDetail() {
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
-  const [opp, signups, profiles, counts, topics, owners] = data
+  const [opp, signups, profiles, counts, topics, owners, history] = data
   if (!opp) {
     return (
       <div className="card">
@@ -352,7 +366,59 @@ export default function OpportunityDetail() {
           )}
         </aside>
       </div>
+
+      {isAdmin && <EditHistory changes={history} people={people} />}
     </div>
+  )
+}
+
+// Admin-only list of past edits, newest first, with the old values so a
+// wiped or mistaken change can be copied back through Edit.
+function EditHistory({ changes, people }: { changes: OpportunityChange[]; people: Map<string, Profile> }) {
+  const [open, setOpen] = useState<number | null>(null)
+  return (
+    <section className="panel stack edit-history">
+      <h2 className="panel-title">Edit history</h2>
+      {changes.length === 0 ? (
+        <p className="small muted">No edits since this was posted (or since edit history started).</p>
+      ) : (
+        <ul className="list">
+          {changes.map((c) => (
+            <li key={c.id} className="stack-sm">
+              <div className="row between wrap gap-sm">
+                <span>
+                  <strong>{c.changed_fields.map(fieldLabel).join(', ')}</strong>
+                  <span className="small muted">
+                    {' '}
+                    · {formatDateTime(c.changed_at)} ·{' '}
+                    {c.changed_by ? displayName(people.get(c.changed_by)) : 'Supabase dashboard'}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-link small"
+                  aria-expanded={open === c.id}
+                  onClick={() => setOpen(open === c.id ? null : c.id)}
+                >
+                  {open === c.id ? 'Hide old values' : 'Show old values'}
+                </button>
+              </div>
+              {open === c.id && (
+                <dl className="history-old">
+                  {c.changed_fields.map((f) => (
+                    <div key={f}>
+                      <dt>{fieldLabel(f)} was</dt>
+                      <dd>{describeOldValue(f, c.old_values[f])}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="small muted">Only admins see this. To undo a change, copy the old value back in with Edit.</p>
+    </section>
   )
 }
 
