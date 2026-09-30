@@ -124,6 +124,7 @@ What protects the data:
 - **Supabase blocks deletes that would erase history.** In the Supabase dashboard, **Authentication > Delete user** fails with "Database error deleting user" if that person has any sign-ups, history or picked topics. Deleting a post that has sign-ups or edit history fails the same way. That error is the safety net working, not a problem. People and posts with no activity delete normally.
 - **Every post edit is kept.** Admins see **Edit history** at the bottom of each post, with the old values, and can copy them back with **Edit**.
 - **Role changes are logged.** **Admin > Manage > Roles** lists the last 10 (who became a poster or admin, and who did it).
+- **Ownership changes are logged** (who added or removed which co-owner, and when). They are in the full backup file.
 
 When someone leaves the group, do nothing on the site: once IT disables their email they cannot get a sign-in code. Their history stays for the records.
 

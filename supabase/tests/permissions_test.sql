@@ -450,13 +450,16 @@ reset role;
 select tests.eq((select show_names::text from public.opportunities where id = :'fair_id'), 'false', 'removed owner cannot edit');
 select tests.eq((select role::text from public.profiles where id = :'poster'), 'poster', 'removed owner keeps their role');
 
--- A member demoted by an admin keeps ownership but cannot edit until a poster again.
+-- Since 0007, being an owner is enough to edit (a demoted owner keeps editing
+-- their own posts until an admin removes them); new posts need the poster role.
 update public.profiles set role = 'member' where id = :'owner2';
 set request.jwt.claim.sub = :'owner2';
 set role authenticated;
 update public.opportunities set show_names = true where id = :'fair_id';
+select tests.expect_error($$insert into public.opportunities (title, region) values ('Not a poster', 'milwaukee')$$, '%row-level security%');
 reset role;
-select tests.eq((select show_names::text from public.opportunities where id = :'fair_id'), 'false', 'owners must be posters to edit');
+select tests.eq((select show_names::text from public.opportunities where id = :'fair_id'), 'true', 'owners edit without the poster role');
+update public.opportunities set show_names = false where id = :'fair_id';
 update public.profiles set role = 'poster' where id = :'owner2';
 
 -- New posts: the creator becomes owner automatically.
@@ -469,6 +472,75 @@ reset role;
 set role anon;
 select tests.expect_error('select * from public.opportunity_owners', 'permission denied%');
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Owners add their own co-owners (0007)
+-- ---------------------------------------------------------------------------
+
+select id as cochair_id from public.opportunities where title = 'Co-chair event' \gset
+
+-- An owner adds a plain member: they can edit, but are not made a poster.
+set request.jwt.claim.sub = :'owner2';
+set role authenticated;
+select tests.eq(public.add_opportunity_owner(:'fair_id', 'doc@ems-wi.com'), 'added', 'owner adds a member as co-owner');
+select tests.eq(public.add_opportunity_owner(:'fair_id', 'doc@ems-wi.com'), 'already', 'adding twice is harmless');
+select tests.expect_error(format($$select public.add_opportunity_owner(%L, 'nobody@ems-wi.com')$$, :'fair_id'), 'This person has not signed in yet%');
+reset role;
+select tests.eq((select role::text from public.profiles where id = :'doc'), 'member', 'owner-added co-owner is not made a poster');
+
+set request.jwt.claim.sub = :'doc';
+set role authenticated;
+update public.opportunities set time_estimate = 'Two hours' where id = :'fair_id';
+select public.set_opportunity_categories(:'fair_id', array[:'wellness_id']::uuid[]);
+select tests.expect_error($$insert into public.opportunities (title, region) values ('Doc post', 'milwaukee')$$, '%row-level security%');
+update public.opportunities set title = 'Changed' where id = :'finance_id';
+select tests.eq(public.add_opportunity_owner(:'fair_id', 'partner@ems-wi.com'), 'added', 'a co-owner adds another co-owner');
+select tests.expect_error(format($$select public.admin_remove_opportunity_owner(%L, %L)$$, :'fair_id', :'owner2'), 'Only admins%');
+select tests.expect_error(format($$delete from public.opportunity_owners where opportunity_id = %L$$, :'fair_id'), 'permission denied%');
+select tests.eq((select count(*)::text from public.owner_changes), '0', 'owners cannot read the ownership log');
+select public.step_down_as_owner(:'fair_id');
+select tests.expect_error(format($$select public.step_down_as_owner(%L)$$, :'fair_id'), 'You are not an owner of this post%');
+reset role;
+select tests.eq((select time_estimate from public.opportunities where id = :'fair_id'), 'Two hours', 'member co-owner edits without the poster role');
+select tests.eq((select string_agg(c.name, ',') from public.opportunity_categories oc join public.interest_categories c on c.id = oc.category_id where oc.opportunity_id = :'fair_id'), 'Wellness', 'member co-owner sets topics');
+select tests.eq((select title from public.opportunities where id = :'finance_id'), 'Finance Committee', 'co-owner cannot edit other posts');
+select tests.eq((select count(*)::text from public.opportunity_owners where opportunity_id = :'fair_id' and user_id = :'doc'), '0', 'owner stepped down');
+
+-- Non-owners cannot add owners.
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+select tests.expect_error(format($$select public.add_opportunity_owner(%L, 'poster@ems-wi.com')$$, :'fair_id'), 'Only this post''s owners or an admin can add owners%');
+reset role;
+set request.jwt.claim.sub = :'staffer';
+set role authenticated;
+select tests.expect_error(format($$select public.add_opportunity_owner(%L, 'staffer@ems-wi.com')$$, :'fair_id'), 'Only this post''s owners or an admin can add owners%');
+select tests.expect_error(format($$select public.step_down_as_owner(%L)$$, :'fair_id'), 'You are not an owner of this post%');
+reset role;
+
+-- An admin adding a plain member still makes them a poster.
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.eq(public.add_opportunity_owner(:'finance_id', 'staffer@ems-wi.com'), 'added_poster', 'admin-added member is made a poster');
+reset role;
+select tests.eq((select role::text from public.profiles where id = :'staffer'), 'poster', 'staffer is now a poster');
+
+-- The only owner cannot step down.
+set request.jwt.claim.sub = :'owner2';
+set role authenticated;
+select tests.expect_error(format($$select public.step_down_as_owner(%L)$$, :'cochair_id'), 'You are the only owner%');
+reset role;
+
+-- Every ownership change is logged, with who did it.
+select tests.eq(
+  (select string_agg(c.action || ' ' || p.email || ' by ' || coalesce(b.email, '-'), '; ' order by c.id)
+   from public.owner_changes c
+   join public.profiles p on p.id = c.user_id
+   left join public.profiles b on b.id = c.changed_by
+   where c.opportunity_id = :'fair_id'),
+  'added poster@ems-wi.com by poster@ems-wi.com; added cochair@ems-wi.com by boss@ems-wi.com; '
+  || 'removed poster@ems-wi.com by boss@ems-wi.com; added doc@ems-wi.com by cochair@ems-wi.com; '
+  || 'added partner@ems-wi.com by doc@ems-wi.com; removed doc@ems-wi.com by doc@ems-wi.com',
+  'ownership log: creator, admin add and remove, owner add, step-down');
 
 -- ---------------------------------------------------------------------------
 -- Safety net (0006): edit history, role log, backups, blocked cascades
@@ -536,7 +608,7 @@ set request.jwt.claim.sub = :'admin';
 set role authenticated;
 select tests.eq(
   (select string_agg(k, ',' order by k) from jsonb_object_keys(public.admin_export_all()) k),
-  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,opportunities,opportunity_categories,opportunity_history,opportunity_owners,profiles,role_changes,schema_version,signup_events,signups',
+  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,profiles,role_changes,schema_version,signup_events,signups',
   'backup has every table');
 select tests.eq(
   (select jsonb_array_length(public.admin_export_all() -> 'signup_events')::text),
@@ -546,7 +618,7 @@ reset role;
 -- If this fails, a new table was added: put it in admin_export_all.
 select tests.eq(
   (select count(*)::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'),
-  '13', 'backup covers every table in the database');
+  '14', 'backup covers every table in the database');
 
 -- Deleting people or posts with activity is blocked (as the Supabase dashboard would).
 select tests.expect_error(format($$delete from auth.users where id = %L$$, :'doc'), '%violates foreign key constraint%');
@@ -576,9 +648,15 @@ select tests.eq((select count(*)::text from public.signup_events where user_id =
 select tests.eq((select status::text from public.signups where user_id = :'staffer' and opportunity_id = :'erase_id'), 'committed', 'waitlist moves up after erase');
 select tests.expect_error($$select public.erase_member_permanently('nobody@ems-wi.com')$$, 'No member with the email%');
 
+-- Erasing an owner: ownership and its log go too.
+select tests.eq(left(public.erase_member_permanently('partner@ems-wi.com'), 30), 'Erased partner@ems-wi.com and ', 'erase an owner');
+select tests.eq((select count(*)::text from public.opportunity_owners where user_id = :'partner'), '0', 'erased owner no longer owns anything');
+select tests.eq((select count(*)::text from public.owner_changes where user_id = :'partner'), '0', 'erased owner''s ownership log is gone');
+
 select tests.eq(left(public.erase_opportunity_permanently(:'fair_id'), 8), 'Erased "', 'erase post reports what it did');
 select tests.eq((select count(*)::text from public.opportunities where id = :'fair_id'), '0', 'erased post is gone');
 select tests.eq((select count(*)::text from public.opportunity_history where opportunity_id = :'fair_id'), '0', 'erased post''s history is gone');
 select tests.eq((select count(*)::text from public.signup_events where opportunity_id = :'fair_id'), '0', 'erased post''s sign-up history is gone');
+select tests.eq((select count(*)::text from public.owner_changes where opportunity_id = :'fair_id'), '0', 'erased post''s ownership log is gone');
 
 \o
