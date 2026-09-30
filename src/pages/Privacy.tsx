@@ -8,8 +8,8 @@ export default function Privacy() {
       <article className={`card stack ${session ? '' : 'login-card wide'}`}>
         <h1>What we track and who sees it</h1>
         <p>
-          This site helps the group share committee, leadership and event opportunities, and helps leadership understand
-          who is interested in what, so we can support people who want to get more involved.
+          <strong>Why this exists:</strong> to share opportunities the moment they open, help everyone find where they
+          fit, and show the group where interest is growing so it can offer more of what people want.
         </p>
 
         <h2>What is recorded</h2>

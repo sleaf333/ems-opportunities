@@ -33,9 +33,11 @@ export default function CompleteProfile() {
     <div className="login-page">
       <form className="card login-card stack" onSubmit={save}>
         <h1>Welcome</h1>
-        <p className="muted">
-          Tell us who you are. When you sign up for something, admins and the person who posted it see your name.
+        <p>
+          This is where the group shares ways to get involved, and where your interests can find a home.
+          Tell us who you are to get started.
         </p>
+        <p className="small muted">When you sign up for something, its owners and admins see your name.</p>
         <label className="field">
           <span>Full name</span>
           <input

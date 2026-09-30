@@ -50,6 +50,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <footer className="footer container">
+        <span className="footer-mission">Built to connect people with opportunities and help every interest grow.</span>
         <Link to="/privacy">What we track and who sees it</Link>
         <span>Never post patient information on this site.</span>
       </footer>
