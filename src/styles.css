@@ -1959,3 +1959,12 @@ tr.expanded td {
 .count-up {
   font-variant-numeric: tabular-nums;
 }
+
+/* Footer: the site's purpose, in the tagline voice, on its own line. */
+.footer-mission {
+  flex-basis: 100%;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.1rem;
+  color: var(--muted);
+}
