@@ -148,10 +148,10 @@ export default function OpportunityForm() {
   }, [id, presetTopic, profile.id])
 
   const canPost = profile.role === 'poster' || profile.role === 'admin'
-  const canEdit =
-    profile.role === 'admin' || (profile.role === 'poster' && (!original || isOwner))
+  // New posts need the poster role; editing needs ownership (or admin), whatever the role.
+  const canEdit = profile.role === 'admin' || isOwner
 
-  if (!canPost) {
+  if (!editing && !canPost) {
     return (
       <div className="card">
         <h1>Posting not available</h1>
@@ -163,7 +163,7 @@ export default function OpportunityForm() {
     return (
       <div className="card">
         <h1>Editing not available</h1>
-        <p>Only this post's owners and admins can edit it. Ask an admin to add you as an owner.</p>
+        <p>Only this post's owners and admins can edit it. Ask one of its owners or an admin to add you.</p>
       </div>
     )
   }

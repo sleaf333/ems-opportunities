@@ -48,7 +48,7 @@ export default function MyPosts() {
       signups={signups.filter((s) => s.opportunity_id === opp.id)}
       people={people}
       me={profile.id}
-      canEdit={canPost}
+      canEdit
     />
   )
 

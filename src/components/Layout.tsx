@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth, useProfile } from '../auth/AuthContext'
+import { supabase } from '../lib/supabase'
 import BrandLogo from './BrandLogo'
 
 export default function Layout() {
@@ -7,6 +9,22 @@ export default function Layout() {
   const { signOut } = useAuth()
   const location = useLocation()
   const canPost = profile.role === 'poster' || profile.role === 'admin'
+  // Members can co-own posts without being posters; they need My posts too.
+  const [ownsPosts, setOwnsPosts] = useState(false)
+  useEffect(() => {
+    if (canPost) return
+    let current = true
+    void supabase
+      .from('opportunity_owners')
+      .select('opportunity_id', { count: 'exact', head: true })
+      .eq('user_id', profile.id)
+      .then(({ count }) => {
+        if (current) setOwnsPosts((count ?? 0) > 0)
+      })
+    return () => {
+      current = false
+    }
+  }, [canPost, profile.id])
 
   return (
     <div className="app">
@@ -18,7 +36,7 @@ export default function Layout() {
           <nav className="nav">
             <NavLink to="/" end>Opportunities</NavLink>
             <NavLink to="/mine">My sign-ups</NavLink>
-            {canPost && <NavLink to="/my-posts">My posts</NavLink>}
+            {(canPost || ownsPosts) && <NavLink to="/my-posts">My posts</NavLink>}
             {canPost && <NavLink to="/new">Post</NavLink>}
             {profile.role === 'admin' && <NavLink to="/admin/insights" className={({ isActive }) => (isActive || location.pathname === '/admin' ? 'active' : '')}>Admin</NavLink>}
             <NavLink to="/profile">Profile</NavLink>

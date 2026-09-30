@@ -37,7 +37,7 @@ export default function Privacy() {
             names only if the post's owners choose to show them.
           </li>
           <li>
-            <strong>The owners of an opportunity</strong> (whoever posted it, plus anyone an admin adds) see who
+            <strong>The owners of an opportunity</strong> (whoever posted it, plus co-owners they or an admin add) see who
             signed up for it, including anyone who withdrew, and can email them.
           </li>
           <li>

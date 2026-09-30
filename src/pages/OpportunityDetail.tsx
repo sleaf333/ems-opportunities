@@ -86,6 +86,7 @@ export default function OpportunityDetail() {
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [ownerNotice, setOwnerNotice] = useState<string | null>(null)
 
   if (error) return <p className="error">Could not load this opportunity: {error}</p>
   if (loading && !data) return <p className="muted">Loading…</p>
@@ -113,7 +114,8 @@ export default function OpportunityDetail() {
   const whoLabel = eligibilityLabel(opp.eligible_positions)
   const isAdmin = profile.role === 'admin'
   const isOwner = owners.some((o) => o.user_id === profile.id)
-  const canEdit = isAdmin || (profile.role === 'poster' && isOwner)
+  // Owners edit without the poster role (0007); posting new ones still needs it.
+  const canEdit = isAdmin || isOwner
   // Names: admins and owners always; everyone else only if the owners allow it.
   const namesVisible = isAdmin || isOwner || opp.show_names
   const manages = isAdmin || isOwner
@@ -215,6 +217,8 @@ export default function OpportunityDetail() {
           </Link>
         )}
       </header>
+
+      {ownerNotice && <p className="notice">{ownerNotice}</p>}
 
       {expired && (
         <p className="warning">
@@ -362,6 +366,7 @@ export default function OpportunityDetail() {
               me={profile.id}
               isAdmin={isAdmin}
               onChange={reload}
+              onSteppedDown={() => setOwnerNotice('You are no longer an owner of this post.')}
             />
           )}
         </aside>
@@ -435,6 +440,7 @@ function OwnersPanel({
   me,
   isAdmin,
   onChange,
+  onSteppedDown,
 }: {
   opportunityId: string
   owners: OpportunityOwner[]
@@ -442,11 +448,13 @@ function OwnersPanel({
   me: string
   isAdmin: boolean
   onChange: () => Promise<void>
+  onSteppedDown: () => void
 }) {
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const canStepDown = !isAdmin && owners.length > 1
 
   async function add(event: FormEvent) {
     event.preventDefault()
@@ -454,7 +462,7 @@ function OwnersPanel({
     setNotice(null)
     setBusy(true)
     const typed = email.trim()
-    const { data: result, error: rpcError } = await supabase.rpc('admin_add_opportunity_owner', {
+    const { data: result, error: rpcError } = await supabase.rpc('add_opportunity_owner', {
       p_opportunity_id: opportunityId,
       p_email: typed,
     })
@@ -468,12 +476,13 @@ function OwnersPanel({
       result === 'already'
         ? `${typed} is already an owner.`
         : result === 'added_poster'
-          ? `${typed} is now an owner. They were also made a poster so they can edit it.`
-          : `${typed} is now an owner.`,
+          ? `${typed} is now a co-owner. They were also made a poster.`
+          : `${typed} is now a co-owner. They can edit this post and see every name on it.`,
     )
     await onChange()
   }
 
+  // Admins only: the database refuses this for anyone else.
   async function remove(owner: OpportunityOwner) {
     const name = owner.user_id === me ? 'yourself' : displayName(people.get(owner.user_id))
     if (!window.confirm(`Remove ${name} as an owner? They will no longer be able to edit this post or see its names.`)) return
@@ -489,6 +498,21 @@ function OwnersPanel({
       setError(friendlyError(rpcError))
       return
     }
+    await onChange()
+  }
+
+  async function stepDown() {
+    if (!window.confirm('Step down as an owner? You will no longer be able to edit this post or see its names.')) return
+    setError(null)
+    setNotice(null)
+    setBusy(true)
+    const { error: rpcError } = await supabase.rpc('step_down_as_owner', { p_opportunity_id: opportunityId })
+    setBusy(false)
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    onSteppedDown()
     await onChange()
   }
 
@@ -519,34 +543,45 @@ function OwnersPanel({
                     Remove
                   </button>
                 )}
+                {o.user_id === me && canStepDown && (
+                  <button
+                    type="button"
+                    className="btn btn-link danger small"
+                    disabled={busy}
+                    onClick={() => void stepDown()}
+                  >
+                    Step down
+                  </button>
+                )}
               </li>
             )
           })}
         </ul>
       )}
-      {isAdmin ? (
-        <form className="stack-sm" onSubmit={(e) => void add(e)}>
-          <label className="field">
-            <span>Add an owner by work email</span>
-            <input
-              type="email"
-              required
-              placeholder="name@ems-wi.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <button className="btn btn-secondary" disabled={busy}>
-            <UserPlus size={15} aria-hidden="true" /> Add owner
-          </button>
-          <p className="small muted">
-            Owners can edit this post, see every name on it and email those people. They must have signed in to the
-            site at least once.
-          </p>
-        </form>
-      ) : (
-        <p className="small muted">Owners can edit this post and see every name on it. Ask an admin to add or remove owners.</p>
-      )}
+      <form className="stack-sm" onSubmit={(e) => void add(e)}>
+        <label className="field">
+          <span>Add a co-owner by work email</span>
+          <input
+            type="email"
+            required
+            placeholder="name@ems-wi.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </label>
+        <button className="btn btn-secondary" disabled={busy}>
+          <UserPlus size={15} aria-hidden="true" /> Add co-owner
+        </button>
+      </form>
+      <p className="small muted">
+        Owners can edit this post, see every name on it and email those people. A new co-owner must have signed in to
+        the site at least once.{' '}
+        {isAdmin
+          ? 'Only admins can remove someone else.'
+          : owners.length > 1
+            ? 'You can step down yourself; only admins can remove someone else.'
+            : 'You are the only owner, so add a co-owner before you can step down. Only admins can remove someone else.'}
+      </p>
       {notice && <p className="notice">{notice}</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
