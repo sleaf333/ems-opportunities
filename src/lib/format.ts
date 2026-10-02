@@ -128,13 +128,13 @@ export const ELIGIBILITY_GROUPS: { key: string; title: string; label: string; po
     label: 'Physicians and APCs',
     positions: ['employed_physician', 'partnership_track', 'partner', 'apc'],
   },
+  { key: 'apc', title: 'For APCs', label: 'APCs', positions: ['apc'] },
   {
     key: 'physicians',
     title: 'For physicians',
     label: 'Physicians',
     positions: ['employed_physician', 'partnership_track', 'partner'],
   },
-  { key: 'apc', title: 'For APCs', label: 'APCs', positions: ['apc'] },
   {
     key: 'track',
     title: 'Shareholder track and shareholders',

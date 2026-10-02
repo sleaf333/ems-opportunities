@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canSignUp, describeOldValue, eligibilityGroup, eligibilityLabel, eligibilityPhrase, fieldLabel, formatDate } from './format'
+import { canSignUp, describeOldValue, ELIGIBILITY_GROUPS, eligibilityGroup, eligibilityLabel, eligibilityPhrase, fieldLabel, formatDate } from './format'
 import type { MemberPosition, Opportunity, Profile } from './types'
 
 const member = (position: MemberPosition): Profile => ({
@@ -51,5 +51,13 @@ describe('edit history wording', () => {
     expect(describeOldValue('eligible_positions', ['apc'])).toBe('APCs')
     expect(describeOldValue('title', 'Wellness Committee')).toBe('Wellness Committee')
     expect(describeOldValue('signup_deadline', '2026-10-05')).toBe(formatDate('2026-10-05'))
+  })
+})
+
+describe('main page sections', () => {
+  it('puts APC-only posts before the physician groups, which stay together', () => {
+    expect(ELIGIBILITY_GROUPS.map((g) => g.key)).toEqual([
+      'everyone', 'clinical', 'apc', 'physicians', 'track', 'shareholders', 'admin_staff',
+    ])
   })
 })
