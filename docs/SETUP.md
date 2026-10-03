@@ -124,7 +124,7 @@ To set many people's positions at once (for example from an Outlook distribution
 
 Run them in that order (shareholders, track, then everyone) so the most specific list wins.
 
-**Before a wider launch:** `clear_pilot_signups.sql` removes every sign-up (and its history) made by the people you paste, so pilot testers' clicks don't show on posts or in Insights. Their accounts, positions, interests and any posts stay. Download a full backup first; this cannot be undone.
+**Before a wider launch:** `clear_pilot_signups.sql` removes every sign-up (and its history) made by the people you paste, and by default every post they created, so pilot testers' clicks and test posts don't show on the site or in Insights. Two settings at the top of the script turn post erasing off, or turn testers who were made posters back into members. Their accounts, positions, interests and every post they did not create stay. Download a full backup first; this cannot be undone.
 
 ## Monthly: back up the data
 
