@@ -687,4 +687,31 @@ update public.opportunities set contacts = '[]' where id = :'finance_id';
 reset role;
 select tests.eq((select jsonb_array_length(contacts)::text from public.opportunities where id = :'finance_id'), '2', 'non-owners cannot change contacts');
 
+-- ---------------------------------------------------------------------------
+-- Positions set in advance (0009)
+-- ---------------------------------------------------------------------------
+
+insert into public.member_presets (email, role, position) values ('track.preset@ems-wi.com', 'member', 'partnership_track');
+insert into auth.users (id, email) values (gen_random_uuid(), 'track.preset@ems-wi.com');
+select tests.eq((select position::text from public.profiles where email = 'track.preset@ems-wi.com'), 'partnership_track', 'preset position applied at first sign-in');
+select tests.eq((select count(*)::text from public.member_presets where email = 'track.preset@ems-wi.com'), '0', 'preset removed once applied');
+
+-- The Admin page's Shareholder checkbox keeps a preset position in step.
+insert into public.member_presets (email, role, position) values ('later.track@ems-wi.com', 'member', 'partnership_track');
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_member('later.track@ems-wi.com', 'poster', false);
+reset role;
+select tests.eq((select role || ',' || position from public.member_presets where email = 'later.track@ems-wi.com'), 'poster,partnership_track', 'saving a role keeps a preset track position');
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_member('later.track@ems-wi.com', 'poster', true);
+reset role;
+select tests.eq((select position::text || ',' || is_partner from public.member_presets where email = 'later.track@ems-wi.com'), 'partner,true', 'ticking Shareholder sets the preset position');
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_member('later.track@ems-wi.com', 'poster', false);
+reset role;
+select tests.eq((select coalesce(position::text, '-') || ',' || is_partner from public.member_presets where email = 'later.track@ems-wi.com'), '-,false', 'unticking Shareholder clears it');
+
 \o

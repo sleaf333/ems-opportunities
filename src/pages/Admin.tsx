@@ -318,7 +318,7 @@ function MemberRoles({
               <li key={p.email} className="row between wrap gap-sm">
                 <span>
                   {p.email} · {ROLE_LABELS[p.role]}
-                  {p.is_partner ? ' · Shareholder' : ''}
+                  {p.position ? ` · ${POSITION_LABELS[p.position]}` : p.is_partner ? ' · Shareholder' : ''}
                 </span>
                 <span className="row gap-sm">
                   <button
