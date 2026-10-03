@@ -49,6 +49,7 @@ function opp(id: string, extra: Partial<Opportunity> = {}): Opportunity {
     show_names: false,
     contact_name: '',
     contact_email: '',
+    contacts: [],
     status: 'open',
     created_by: null,
     created_at: daysAgo(10),

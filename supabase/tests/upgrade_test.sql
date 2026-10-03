@@ -45,4 +45,12 @@ select tests.eq(
   'existing data: deletes with history now blocked');
 select tests.expect_error($$delete from auth.users where email = 'holder@ems-wi.com'$$, '%violates foreign key constraint%');
 
+-- 0008: each post's single contact became the first entry in its list, and the
+-- one-time copy was not recorded as an edit.
+select tests.eq(
+  (select count(*)::text from public.opportunities
+   where contacts = '[{"name": "EMS Admin", "email": "admin@ems-wi.com"}]'::jsonb),
+  '15', 'existing contacts copied into the new list');
+select tests.eq((select count(*)::text from public.opportunity_history where 'contacts' = any (changed_fields)), '0', 'copying contacts added no edit history');
+
 \o

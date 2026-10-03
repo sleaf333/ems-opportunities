@@ -1994,3 +1994,45 @@ tr.expanded td {
   font-size: 1.1rem;
   color: var(--muted);
 }
+
+/* Post form: one row per contact (name, email, remove). */
+.contact-rows {
+  display: grid;
+  gap: 0.5rem;
+}
+.contact-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.contact-remove {
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0.3rem 0.55rem;
+}
+@media (max-width: 520px) {
+  .contact-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .contact-row input[type='email'] {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .contact-remove {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  /* Each person's name and email stack, so separate one person from the next. */
+  .contact-row + .contact-row {
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--hairline);
+  }
+  .contact-rows {
+    gap: 0.6rem;
+  }
+}
+.contact-list {
+  display: grid;
+  gap: 0.2rem;
+}

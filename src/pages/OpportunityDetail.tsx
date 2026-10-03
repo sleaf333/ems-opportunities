@@ -39,6 +39,7 @@ import {
 import {
   canSignUp,
   COMMITMENT_LABELS,
+  contactsOf,
   deadlinePassed,
   describeOldValue,
   displayName,
@@ -179,20 +180,25 @@ export default function OpportunityDetail() {
     label: 'Spots',
     value: opp.capacity ? `${committedCount} of ${opp.capacity} taken` : 'No limit',
   })
-  if (opp.contact_name || opp.contact_email) {
+  const contacts = contactsOf(opp)
+  if (contacts.length > 0) {
     facts.push({
       icon: Mail,
-      label: 'Contact',
+      label: contacts.length === 1 ? 'Contact' : 'Contacts',
       value: (
-        <>
-          {opp.contact_name}
-          {opp.contact_email && (
-            <>
-              {opp.contact_name ? ' · ' : ''}
-              <a href={`mailto:${opp.contact_email}`}>{opp.contact_email}</a>
-            </>
-          )}
-        </>
+        <span className="contact-list">
+          {contacts.map((c, i) => (
+            <span key={i}>
+              {c.name}
+              {c.email && (
+                <>
+                  {c.name ? ' · ' : ''}
+                  <a href={`mailto:${c.email}`}>{c.email}</a>
+                </>
+              )}
+            </span>
+          ))}
+        </span>
       ),
     })
   }

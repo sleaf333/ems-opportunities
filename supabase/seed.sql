@@ -92,9 +92,9 @@ with data (title, eligible, time_estimate, description, categories) as (
 ),
 inserted as (
   insert into public.opportunities
-    (title, type, commitment, eligible_positions, region, time_estimate, description, contact_name, contact_email)
+    (title, type, commitment, eligible_positions, region, time_estimate, description, contact_name, contact_email, contacts)
   select title, 'committee', 'ongoing', eligible::public.member_position[], 'group_wide', time_estimate, description,
-         'EMS Admin', 'admin@ems-wi.com'
+         'EMS Admin', 'admin@ems-wi.com', '[{"name": "EMS Admin", "email": "admin@ems-wi.com"}]'::jsonb
   from data
   returning id, title
 )

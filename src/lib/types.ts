@@ -60,6 +60,12 @@ export interface MemberPreset {
   created_at: string
 }
 
+// Who to ask about a post (anyone, not just site users).
+export interface Contact {
+  name: string
+  email: string
+}
+
 export interface Opportunity {
   id: string
   title: string
@@ -80,6 +86,7 @@ export interface Opportunity {
   show_names: boolean
   contact_name: string
   contact_email: string
+  contacts: Contact[]
   status: OppStatus
   created_by: string | null
   created_at: string
