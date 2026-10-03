@@ -1,5 +1,6 @@
 import type {
   CommitmentLevel,
+  Contact,
   MemberPosition,
   Opportunity,
   OppFormat,
@@ -216,6 +217,7 @@ export const FIELD_LABELS: Record<string, string> = {
   show_names: 'Names shown to members',
   contact_name: 'Contact name',
   contact_email: 'Contact email',
+  contacts: 'Contacts',
   status: 'Status',
 }
 
@@ -229,6 +231,9 @@ export function describeOldValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '(empty)'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (field === 'eligible_positions' && Array.isArray(value)) return eligibilityLabel(value as MemberPosition[])
+  if (field === 'contacts' && Array.isArray(value)) {
+    return value.length === 0 ? '(empty)' : (value as Contact[]).map(contactText).join(', ')
+  }
   const text = String(value)
   const labels: Record<string, Record<string, string>> = {
     type: TYPE_LABELS,
@@ -240,4 +245,53 @@ export function describeOldValue(field: string, value: unknown): string {
   if (labels[field]) return labels[field][text] ?? text
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return formatDate(text)
   return text
+}
+
+// ---------------------------------------------------------------------------
+// Contacts: a post lists up to MAX_CONTACTS people to ask (name and email).
+// ---------------------------------------------------------------------------
+
+export const MAX_CONTACTS = 10
+
+// The post's contacts; older posts saved before the list existed fall back to
+// their single contact.
+export function contactsOf(opp: Pick<Opportunity, 'contacts' | 'contact_name' | 'contact_email'>): Contact[] {
+  if (opp.contacts && opp.contacts.length > 0) return opp.contacts
+  if (opp.contact_name || opp.contact_email) return [{ name: opp.contact_name, email: opp.contact_email }]
+  return []
+}
+
+export function contactText(c: Contact): string {
+  if (c.name && c.email) return `${c.name} (${c.email})`
+  return c.name || c.email
+}
+
+// Tidies the rows typed on the form: trims, drops blank rows and repeated
+// emails. Returns an error message instead when something needs fixing.
+export function cleanContacts(rows: Contact[]): { contacts: Contact[]; error: string | null } {
+  const contacts: Contact[] = []
+  const seen = new Set<string>()
+  for (const row of rows) {
+    const name = row.name.trim()
+    const email = row.email.trim()
+    if (!name && !email) continue
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { contacts: [], error: `"${email}" does not look like an email address.` }
+    }
+    const key = email.toLowerCase()
+    if (key && seen.has(key)) continue
+    if (key) seen.add(key)
+    contacts.push({ name, email })
+  }
+  if (contacts.length > MAX_CONTACTS) {
+    return { contacts: [], error: `A post can list up to ${MAX_CONTACTS} contacts.` }
+  }
+  return { contacts, error: null }
+}
+
+// Adds people (for example the post's owners) who are not already listed.
+export function mergeContacts(current: Contact[], extra: Contact[]): Contact[] {
+  const kept = current.filter((c) => c.name.trim() || c.email.trim())
+  const emails = new Set(kept.map((c) => c.email.trim().toLowerCase()).filter(Boolean))
+  return [...kept, ...extra.filter((c) => !emails.has(c.email.trim().toLowerCase()))]
 }

@@ -5,12 +5,16 @@ import { categoriesByOpportunity, fetchCategories, fetchOpportunity, fetchOpport
 import {
   addDays,
   ALL_POSITIONS,
+  cleanContacts,
   COMMITMENT_LABELS,
+  contactsOf,
   eligibilityGroup,
   ELIGIBILITY_GROUPS,
   FORMAT_LABELS,
   formatDate,
   localToday,
+  MAX_CONTACTS,
+  mergeContacts,
   POSITION_LABELS,
   REGION_LABELS,
   STATUS_LABELS,
@@ -19,6 +23,7 @@ import {
 import { friendlyError, supabase } from '../lib/supabase'
 import type {
   CommitmentLevel,
+  Contact,
   InterestCategory,
   Opportunity,
   MemberPosition,
@@ -50,8 +55,7 @@ interface FormState {
   visible_until: string
   new_hire_friendly: boolean
   show_names: boolean
-  contact_name: string
-  contact_email: string
+  contacts: Contact[]
   status: OppStatus
 }
 
@@ -78,8 +82,7 @@ function fromOpportunity(o: Opportunity): FormState {
     visible_until: o.visible_until ?? addDays(localToday(), DEFAULT_POSTING_DAYS),
     new_hire_friendly: o.new_hire_friendly,
     show_names: o.show_names,
-    contact_name: o.contact_name,
-    contact_email: o.contact_email,
+    contacts: contactsOf(o).length ? contactsOf(o) : [{ name: '', email: '' }],
     status: o.status,
   }
 }
@@ -108,8 +111,7 @@ export default function OpportunityForm() {
     ...defaultWindow('committee'),
     new_hire_friendly: false,
     show_names: false,
-    contact_name: profile.full_name,
-    contact_email: profile.email,
+    contacts: [{ name: profile.full_name, email: profile.email }],
     status: 'open',
   }))
   const [windowTouched, setWindowTouched] = useState(false)
@@ -118,6 +120,8 @@ export default function OpportunityForm() {
   const [picked, setPicked] = useState<string[]>([])
   const [original, setOriginal] = useState<Opportunity | null>(null)
   const [isOwner, setIsOwner] = useState(false)
+  const [ownerIds, setOwnerIds] = useState<string[]>([])
+  const [contactsNote, setContactsNote] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,6 +144,7 @@ export default function OpportunityForm() {
         }
         setOriginal(opp)
         setIsOwner(owners.some((o) => o.user_id === profile.id))
+        setOwnerIds(owners.map((o) => o.user_id))
         setCategories(cats)
         setForm(fromOpportunity(opp))
         setPicked((categoriesByOpportunity(links, cats).get(id) ?? []).map((c) => c.id))
@@ -188,6 +193,54 @@ export default function OpportunityForm() {
     }))
   }
 
+  function setContact(index: number, key: keyof Contact, value: string) {
+    setForm((prev) => ({
+      ...prev,
+      contacts: prev.contacts.map((c, i) => (i === index ? { ...c, [key]: value } : c)),
+    }))
+  }
+
+  function removeContact(index: number) {
+    setForm((prev) => {
+      const contacts = prev.contacts.filter((_, i) => i !== index)
+      return { ...prev, contacts: contacts.length ? contacts : [{ name: '', email: '' }] }
+    })
+  }
+
+  // Fill the list from the post's owners (on a new post, that is you).
+  async function addOwners() {
+    setContactsNote(null)
+    let owners: Contact[] = [{ name: profile.full_name, email: profile.email }]
+    if (editing) {
+      if (ownerIds.length === 0) {
+        setContactsNote('This post has no owners yet.')
+        return
+      }
+      const { data, error: loadError } = await supabase.from('profiles').select('id, full_name, email').in('id', ownerIds)
+      if (loadError) {
+        setContactsNote(friendlyError(loadError))
+        return
+      }
+      const byOwner = new Map((data ?? []).map((p) => [p.id as string, p]))
+      owners = ownerIds
+        .map((oid) => byOwner.get(oid))
+        .filter((p): p is NonNullable<typeof p> => Boolean(p))
+        .map((p) => ({ name: (p.full_name as string) || '', email: p.email as string }))
+    }
+    const merged = mergeContacts(form.contacts, owners)
+    const added = merged.length - form.contacts.filter((c) => c.name.trim() || c.email.trim()).length
+    if (added === 0) {
+      setContactsNote('The owners are already listed.')
+      return
+    }
+    if (merged.length > MAX_CONTACTS) {
+      setContactsNote(`A post can list up to ${MAX_CONTACTS} contacts.`)
+      return
+    }
+    set('contacts', merged)
+    setContactsNote(added === 1 ? 'Added 1 owner.' : `Added ${added} owners.`)
+  }
+
   function togglePicked(categoryId: string) {
     setPicked((prev) => (prev.includes(categoryId) ? prev.filter((c) => c !== categoryId) : [...prev, categoryId]))
   }
@@ -209,6 +262,11 @@ export default function OpportunityForm() {
     }
     if (!form.indefinite && !form.visible_until) {
       setError('Pick a "Show on site until" date, or choose "Keep posted indefinitely".')
+      return
+    }
+    const tidy = cleanContacts(form.contacts)
+    if (tidy.error) {
+      setError(tidy.error)
       return
     }
     const capacity = form.capacity.trim() ? Number(form.capacity) : null
@@ -233,8 +291,10 @@ export default function OpportunityForm() {
       visible_until: form.indefinite ? null : form.visible_until,
       new_hire_friendly: form.new_hire_friendly,
       show_names: form.show_names,
-      contact_name: form.contact_name.trim(),
-      contact_email: form.contact_email.trim(),
+      contacts: tidy.contacts,
+      // The first contact is also kept in the older single-contact fields.
+      contact_name: tidy.contacts[0]?.name ?? '',
+      contact_email: tidy.contacts[0]?.email ?? '',
       status: form.status,
     }
     setBusy(true)
@@ -508,16 +568,51 @@ export default function OpportunityForm() {
       </section>
 
       <section className="card stack">
-        <h2>Contact and status</h2>
-        <div className="grid-2">
-          <label className="field">
-            <span>Contact name</span>
-            <input value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Contact email</span>
-            <input type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} />
-          </label>
+        <h2>Contacts and status</h2>
+        <div className="field">
+          <span>Contacts</span>
+          <small>Who people can ask about this. Anyone, not just site members. Up to {MAX_CONTACTS}.</small>
+          <div className="contact-rows">
+            {form.contacts.map((c, i) => (
+              <div className="contact-row" key={i}>
+                <input
+                  aria-label={`Contact ${i + 1} name`}
+                  placeholder="Name"
+                  value={c.name}
+                  onChange={(e) => setContact(i, 'name', e.target.value)}
+                />
+                <input
+                  type="email"
+                  aria-label={`Contact ${i + 1} email`}
+                  placeholder="name@ems-wi.com"
+                  value={c.email}
+                  onChange={(e) => setContact(i, 'email', e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-link danger contact-remove"
+                  aria-label={`Remove contact ${i + 1}`}
+                  onClick={() => removeContact(i)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="row wrap gap-sm">
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              disabled={form.contacts.length >= MAX_CONTACTS}
+              onClick={() => set('contacts', [...form.contacts, { name: '', email: '' }])}
+            >
+              + Add another contact
+            </button>
+            <button type="button" className="btn btn-secondary btn-small" onClick={() => void addOwners()}>
+              Add the owners
+            </button>
+          </div>
+          {contactsNote && <small role="status">{contactsNote}</small>}
         </div>
         <label className="field">
           <span>Status</span>

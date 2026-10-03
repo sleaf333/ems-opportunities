@@ -659,4 +659,32 @@ select tests.eq((select count(*)::text from public.opportunity_history where opp
 select tests.eq((select count(*)::text from public.signup_events where opportunity_id = :'fair_id'), '0', 'erased post''s sign-up history is gone');
 select tests.eq((select count(*)::text from public.owner_changes where opportunity_id = :'fair_id'), '0', 'erased post''s ownership log is gone');
 
+-- ---------------------------------------------------------------------------
+-- Multiple contacts (0008)
+-- ---------------------------------------------------------------------------
+
+select tests.eq((select contacts::text from public.opportunities where title = 'Trauma'), '[{"name": "EMS Admin", "email": "admin@ems-wi.com"}]', 'seed committees have a contact list');
+insert into public.opportunities (title, region) values ('No contacts yet', 'milwaukee');
+select tests.eq((select contacts::text from public.opportunities where title = 'No contacts yet'), '[]', 'new posts start with an empty list');
+select tests.expect_error($$update public.opportunities set contacts = '{"name": "x"}' where title = 'No contacts yet'$$, '%opportunities_contacts_check%');
+select tests.expect_error(
+  $$update public.opportunities set contacts = (select jsonb_agg(jsonb_build_object('name', 'P' || g, 'email', '')) from generate_series(1, 11) g) where title = 'No contacts yet'$$,
+  '%opportunities_contacts_check%');
+
+-- An owner of Finance (staffer, added earlier) can change its contacts; others cannot.
+set request.jwt.claim.sub = :'staffer';
+set role authenticated;
+update public.opportunities
+set contacts = '[{"name": "Chair", "email": "chair@ems-wi.com"}, {"name": "Office", "email": ""}]'
+where id = :'finance_id';
+reset role;
+select tests.eq((select jsonb_array_length(contacts)::text from public.opportunities where id = :'finance_id'), '2', 'owner saves two contacts');
+select tests.eq((select changed_fields::text from public.opportunity_history where opportunity_id = :'finance_id' order by id desc limit 1), '{contacts}', 'contact changes appear in edit history');
+
+set request.jwt.claim.sub = :'doc';
+set role authenticated;
+update public.opportunities set contacts = '[]' where id = :'finance_id';
+reset role;
+select tests.eq((select jsonb_array_length(contacts)::text from public.opportunities where id = :'finance_id'), '2', 'non-owners cannot change contacts');
+
 \o
