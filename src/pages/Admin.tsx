@@ -305,7 +305,7 @@ function MemberRoles({
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // "Change role" on a member row fills this form in.
+  // "Change site role" on a member row fills this form in.
   useEffect(() => {
     if (!draft) return
     setEmail(draft.email)
@@ -322,6 +322,18 @@ function MemberRoles({
     const address = email.trim().toLowerCase()
     if (!isAllowedEmail(address)) {
       setError(`Email must end in @${EMAIL_DOMAIN}.`)
+      return
+    }
+    // Granting site admin is rare and powerful: confirm it.
+    const current =
+      data.profiles.find((x) => x.email === address)?.role ?? data.presets.find((x) => x.email === address)?.role
+    if (
+      role === 'admin' &&
+      current !== 'admin' &&
+      !window.confirm(
+        `Make ${address} a site admin?\n\nSite admins can see and export everything (interests, leadership goals, all history), download full backups and change anyone's site role. Keep this to a few people.`,
+      )
+    ) {
       return
     }
     setBusy(true)
@@ -354,11 +366,20 @@ function MemberRoles({
   return (
     <form id="roles" className="card stack" onSubmit={save}>
       <div>
-        <h2>Roles and shareholders</h2>
+        <h2>Site roles and shareholder status</h2>
         <p className="small muted">
-          Posters can post opportunities. Admins can do everything, including this page. Shareholders can commit to
-          shareholders-only opportunities. Members choose their own position, and you can correct it here. If the person has not signed in
-          yet, this is saved and applied the first time they do.
+          A site role controls what someone can do on this website: <strong>Member</strong> (browse and sign up),{' '}
+          <strong>Poster</strong> (create posts) or <strong>Site admin</strong> (everything, including this page and
+          all data). It has nothing to do with a person's job or position (physician, APC, Administrative staff).
+          Tick <strong>Shareholder</strong> to correct someone's position to Shareholder. If the person has not
+          signed in yet, this is saved and applied the first time they do.
+        </p>
+        <p className="small">
+          <strong>Site admins now ({data.profiles.filter((x) => x.role === 'admin').length}):</strong>{' '}
+          {data.profiles
+            .filter((x) => x.role === 'admin')
+            .map((x) => displayName(x))
+            .join(', ')}
         </p>
       </div>
       <div className="grid-3">
@@ -373,7 +394,7 @@ function MemberRoles({
           />
         </label>
         <label className="field">
-          <span>Role</span>
+          <span>Site role</span>
           <select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
             {Object.entries(ROLE_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
@@ -703,7 +724,7 @@ function Members({
     downloadCsv(
       `members-${stamp}.csv`,
       toCsv(
-        ['Name', 'Email', 'Position', 'Role', 'Interested now', 'Committed now', 'Completed', 'Withdrawn', 'Ever committed', 'Last activity', 'Interest topics', 'Other interests', 'Leadership goals', 'Joined'],
+        ['Name', 'Email', 'Position', 'Site role', 'Interested now', 'Committed now', 'Completed', 'Withdrawn', 'Ever committed', 'Last activity', 'Interest topics', 'Other interests', 'Leadership goals', 'Joined'],
         data.profiles.map((p) => {
           const e = engagement.get(p.id) ?? BLANK_ENGAGEMENT
           const i = interestsByUser.get(p.id)
@@ -820,7 +841,7 @@ function Members({
             <tr>
               <th>Name</th>
               <th>Position</th>
-              <th>Role</th>
+              <th>Site role</th>
               <th>Interests</th>
               <th className="num" title="Current interests">Interested</th>
               <th className="num" title="Committed or waitlisted now">Committed</th>
@@ -848,7 +869,7 @@ function Members({
                   <td className="num">{e.withdrawn}</td>
                   <td className="small">{e.lastActivity ? formatDate(e.lastActivity) : '—'}</td>
                   <td className="nowrap">
-                    <button className="btn btn-link" onClick={() => onChangeRole(p)}>Change role</button>
+                    <button className="btn btn-link" onClick={() => onChangeRole(p)}>Change site role</button>
                     <a className="btn btn-link" href={`mailto:${p.email}`}>Email</a>
                   </td>
                 </tr>

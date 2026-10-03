@@ -119,6 +119,8 @@ To set many people's positions at once (for example from an Outlook distribution
 - `set_shareholders.sql`: everyone listed becomes Shareholder.
 - `set_shareholder_track.sql`: listed people with no position or Employed physician become Shareholder track. Shareholders are never touched.
 - `set_physicians.sql`: listed people with no position yet become Employed physician. Nobody with a position is changed.
+- `set_apcs.sql`: listed people with no position yet become APC. Nobody with a position is changed; it also counts anyone on the list already set as a physician, so you can check them by hand.
+- `set_admin_staff.sql`: listed people with no position yet become Administrative staff. Nobody with a position is changed; it also counts anyone on the list already set as a physician or APC.
 
 Run them in that order (shareholders, track, then everyone) so the most specific list wins.
 
