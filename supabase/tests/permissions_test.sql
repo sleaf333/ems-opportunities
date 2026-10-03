@@ -608,7 +608,7 @@ set request.jwt.claim.sub = :'admin';
 set role authenticated;
 select tests.eq(
   (select string_agg(k, ',' order by k) from jsonb_object_keys(public.admin_export_all()) k),
-  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,profiles,role_changes,schema_version,signup_events,signups',
+  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,post_requests,profiles,role_changes,schema_version,signup_events,signups',
   'backup has every table');
 select tests.eq(
   (select jsonb_array_length(public.admin_export_all() -> 'signup_events')::text),
@@ -618,7 +618,7 @@ reset role;
 -- If this fails, a new table was added: put it in admin_export_all.
 select tests.eq(
   (select count(*)::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'),
-  '14', 'backup covers every table in the database');
+  '15', 'backup covers every table in the database');
 
 -- Deleting people or posts with activity is blocked (as the Supabase dashboard would).
 select tests.expect_error(format($$delete from auth.users where id = %L$$, :'doc'), '%violates foreign key constraint%');
@@ -713,5 +713,69 @@ set role authenticated;
 select public.admin_set_member('later.track@ems-wi.com', 'poster', false);
 reset role;
 select tests.eq((select coalesce(position::text, '-') || ',' || is_partner from public.member_presets where email = 'later.track@ems-wi.com'), '-,false', 'unticking Shareholder clears it');
+
+-- ---------------------------------------------------------------------------
+-- Requesting posting access (0010)
+-- ---------------------------------------------------------------------------
+
+\set req1 'a0000000-0000-0000-0000-000000000011'
+\set req2 'a0000000-0000-0000-0000-000000000012'
+insert into auth.users (id, email) values (:'req1', 'req.one@ems-wi.com'), (:'req2', 'req.two@ems-wi.com');
+update public.profiles set full_name = 'Req One', position = 'employed_physician' where id in (:'req1', :'req2');
+
+set request.jwt.claim.sub = :'req1';
+set role authenticated;
+select tests.eq(public.request_posting(' Grand rounds series '), 'requested', 'member requests posting access');
+select tests.eq(public.request_posting('again'), 'already', 'only one waiting request');
+select tests.eq((select note from public.post_requests where user_id = auth.uid()), 'Grand rounds series', 'note saved, trimmed');
+select tests.expect_error($$insert into public.post_requests (user_id) values (auth.uid())$$, 'permission denied%');
+select tests.expect_error($$select public.admin_decide_post_requests(array(select id from public.post_requests), true)$$, 'Only admins%');
+reset role;
+
+set request.jwt.claim.sub = :'req2';
+set role authenticated;
+select tests.eq(public.request_posting(''), 'requested', 'second member requests');
+select tests.eq((select count(*)::text from public.post_requests), '1', 'members see only their own requests');
+reset role;
+
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+select tests.expect_error($$select public.request_posting('')$$, 'You can already post%');
+reset role;
+
+set role anon;
+select tests.expect_error($$select public.request_posting('')$$, 'permission denied%');
+reset role;
+
+-- Admin approves one and declines the other.
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.eq((select count(*)::text from public.post_requests where status = 'pending'), '2', 'admin sees waiting requests');
+select tests.eq(public.admin_decide_post_requests(array(select id from public.post_requests where user_id = :'req1'), true)::text, '1', 'admin approves');
+select tests.eq(public.admin_decide_post_requests(array(select id from public.post_requests where user_id = :'req2'), false)::text, '1', 'admin declines');
+select tests.eq(public.admin_decide_post_requests(array(select id from public.post_requests), true)::text, '0', 'decided requests are not decided again');
+reset role;
+select tests.eq((select role::text from public.profiles where id = :'req1'), 'poster', 'approved member is now a poster');
+select tests.eq((select role::text from public.profiles where id = :'req2'), 'member', 'declined member stays a member');
+select tests.eq((select new_role || ' by ' || changed_by from public.role_changes where user_id = :'req1' order by id desc limit 1), 'poster by ' || :'admin', 'approval logged as a role change');
+select tests.eq((select status || ',' || (decided_by = :'admin') from public.post_requests where user_id = :'req2'), 'declined,true', 'decision recorded');
+
+-- A declined member can ask again later; an approved poster cannot.
+set request.jwt.claim.sub = :'req2';
+set role authenticated;
+select tests.eq(public.request_posting('Trying again'), 'requested', 'declined member can request again');
+reset role;
+set request.jwt.claim.sub = :'req1';
+set role authenticated;
+select tests.expect_error($$select public.request_posting('')$$, 'You can already post%');
+reset role;
+
+-- Approving never downgrades an admin.
+update public.profiles set role = 'admin' where id = :'req2';
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_decide_post_requests(array(select id from public.post_requests where user_id = :'req2' and status = 'pending'), true);
+reset role;
+select tests.eq((select role::text from public.profiles where id = :'req2'), 'admin', 'approval leaves admins as admins');
 
 \o

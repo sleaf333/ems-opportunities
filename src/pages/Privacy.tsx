@@ -21,7 +21,7 @@ export default function Privacy() {
           <li>Each time you mark yourself interested, commit, join a waitlist or withdraw, and when.</li>
           <li>Attendance or completion, if the organizer records it.</li>
           <li>The interest topics you pick, anything else you write in, and leadership goals, if you add them.</li>
-          <li>Changes to posts and to roles (poster, admin), with who made them, so mistakes can be undone.</li>
+          <li>Changes to posts and to roles (poster, admin), and requests to post, with who made them, so mistakes can be undone.</li>
         </ul>
 
         <h2>What is not recorded</h2>

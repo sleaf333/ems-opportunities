@@ -9,6 +9,23 @@ export default function Layout() {
   const { signOut } = useAuth()
   const location = useLocation()
   const canPost = profile.role === 'poster' || profile.role === 'admin'
+  const isAdmin = profile.role === 'admin'
+  // Admins: how many posting requests are waiting (refreshed on each page change).
+  const [waiting, setWaiting] = useState(0)
+  useEffect(() => {
+    if (!isAdmin) return
+    let current = true
+    void supabase
+      .from('post_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => {
+        if (current) setWaiting(count ?? 0)
+      })
+    return () => {
+      current = false
+    }
+  }, [isAdmin, location.pathname])
   // Members can co-own posts without being posters; they need My posts too.
   const [ownsPosts, setOwnsPosts] = useState(false)
   useEffect(() => {
@@ -37,8 +54,16 @@ export default function Layout() {
             <NavLink to="/" end>Opportunities</NavLink>
             <NavLink to="/mine">My sign-ups</NavLink>
             {(canPost || ownsPosts) && <NavLink to="/my-posts">My posts</NavLink>}
-            {canPost && <NavLink to="/new">Post</NavLink>}
-            {profile.role === 'admin' && <NavLink to="/admin/insights" className={({ isActive }) => (isActive || location.pathname === '/admin' ? 'active' : '')}>Admin</NavLink>}
+            {/* Members see Post too: it leads to "Request posting access". */}
+            <NavLink to="/new">Post</NavLink>
+            {profile.role === 'admin' && <NavLink to={waiting > 0 ? '/admin#requests' : '/admin/insights'} className={({ isActive }) => (isActive || location.pathname === '/admin' ? 'active' : '')}>
+              Admin
+              {waiting > 0 && (
+                <span className="nav-count" aria-label={`${waiting} posting ${waiting === 1 ? 'request' : 'requests'} waiting`}>
+                  {waiting}
+                </span>
+              )}
+            </NavLink>}
             <NavLink to="/profile">Profile</NavLink>
             <button className="btn btn-link nav-signout" onClick={() => void signOut()}>
               Sign out

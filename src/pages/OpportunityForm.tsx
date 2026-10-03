@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
+import RequestPosting from '../components/RequestPosting'
 import { categoriesByOpportunity, fetchCategories, fetchOpportunity, fetchOpportunityCategories, fetchOwners } from '../lib/data'
 import {
   addDays,
@@ -156,14 +157,7 @@ export default function OpportunityForm() {
   // New posts need the poster role; editing needs ownership (or admin), whatever the role.
   const canEdit = profile.role === 'admin' || isOwner
 
-  if (!editing && !canPost) {
-    return (
-      <div className="card">
-        <h1>Posting not available</h1>
-        <p>An admin needs to approve you as a poster first.</p>
-      </div>
-    )
-  }
+  if (!editing && !canPost) return <RequestPosting />
   if (editing && original && !canEdit) {
     return (
       <div className="card">

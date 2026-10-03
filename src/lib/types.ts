@@ -122,6 +122,17 @@ export interface RoleChange {
   changed_at: string
 }
 
+// A member asking to be allowed to post (0010).
+export interface PostRequest {
+  id: number
+  user_id: string
+  note: string
+  status: 'pending' | 'approved' | 'declined'
+  requested_at: string
+  decided_by: string | null
+  decided_at: string | null
+}
+
 export interface BackupRecord {
   id: number
   downloaded_by: string | null
