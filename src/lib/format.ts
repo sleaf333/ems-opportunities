@@ -72,7 +72,8 @@ export const SELF_POSITIONS: MemberPosition[] = ['employed_physician', 'partners
 export const ROLE_LABELS: Record<UserRole, string> = {
   member: 'Member',
   poster: 'Poster',
-  admin: 'Admin',
+  // "Site admin", not "Admin", so it can't be mistaken for the Administrative staff position.
+  admin: 'Site admin',
 }
 
 // Dates are stored as YYYY-MM-DD. Format them without converting time zones,
