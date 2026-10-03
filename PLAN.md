@@ -183,4 +183,5 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-30 | "Moments of delight" for members: a brief burst of the five EMS dots and "You're in!" on Commit (not on the waitlist), a ripple on Interested, numbers that count up, spot bars that fill. Understated, no new libraries, and fully off for people who turn on reduced motion |
 | 2026-09-30 | The site states its purpose positively in three places (welcome screen, footer, What we track page); no "not punitive" wording, which would plant the idea |
 | 2026-10-03 | Posts list several contacts (name and email each, up to 10, anyone). The edit page has "Add another contact" and "Add the owners"; contacts stay separate from owners (owners edit, contacts are who to ask) |
+| 2026-10-03 | Positions can be set in advance for people who have not signed in, and in bulk from pasted lists (shareholders, then track, then all physicians). Lists never downgrade a position or change roles |
 | 2026-09-30 | The member directory (names, emails, positions, roles) stays readable to signed-in members, like the Outlook address book; interests, goals and history stay private to the member and admins |

@@ -112,6 +112,16 @@ From now on, every change merged into `main` on GitHub redeploys the site automa
 - **Shareholders** choose Shareholder as their position when they first sign in. If someone picks the wrong position, fix it on the Admin page (**Change role** on their row, tick or untick **Shareholder**, **Save**).
 - **Share the link** in the newsletter.
 
+## Setting positions from a list
+
+To set many people's positions at once (for example from an Outlook distribution list), use the scripts in `supabase/scripts/`. Open one on GitHub, copy it, paste it into **SQL Editor > New query**, replace the line `PASTE THE EMAILS HERE` with your list (any format, names are ignored), and click **Run**. Each script reports what it found and changed, never changes anyone's role, and is safe to run more than once. People who have not signed in yet get the position in advance (shown on the Admin page under "Waiting for first sign-in").
+
+- `set_shareholders.sql`: everyone listed becomes Shareholder.
+- `set_shareholder_track.sql`: listed people with no position or Employed physician become Shareholder track. Shareholders are never touched.
+- `set_physicians.sql`: listed people with no position yet become Employed physician. Nobody with a position is changed.
+
+Run them in that order (shareholders, track, then everyone) so the most specific list wins.
+
 ## Monthly: back up the data
 
 The free Supabase plan does not include backups you can restore. Once a month, on **Admin > Manage**, click **Download full backup** and save the file to the group's OneDrive or SharePoint (never personal email or a personal drive: it contains names, emails, interests and leadership goals). The box turns yellow when the last backup is more than 30 days old. Only admins can download it, and every download is recorded.

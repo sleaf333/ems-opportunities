@@ -53,4 +53,7 @@ select tests.eq(
   '15', 'existing contacts copied into the new list');
 select tests.eq((select count(*)::text from public.opportunity_history where 'contacts' = any (changed_fields)), '0', 'copying contacts added no edit history');
 
+-- 0009: existing Shareholder advance settings carry over as a position.
+select tests.eq((select coalesce(position::text, '-') from public.member_presets where email = 'pending@ems-wi.com'), 'partner', 'shareholder preset became a preset position');
+
 \o

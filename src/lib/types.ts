@@ -57,6 +57,8 @@ export interface MemberPreset {
   email: string
   role: UserRole
   is_partner: boolean
+  // Position applied at first sign-in (0009); older rows only have is_partner.
+  position: MemberPosition | null
   created_at: string
 }
 
