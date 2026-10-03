@@ -98,6 +98,7 @@ function makeData(parts: Partial<AdminData>): AdminData {
     presets: [],
     recentRoleChanges: [],
     lastBackup: null,
+    postRequests: [],
     ...parts,
   }
 }

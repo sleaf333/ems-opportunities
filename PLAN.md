@@ -184,4 +184,5 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-09-30 | The site states its purpose positively in three places (welcome screen, footer, What we track page); no "not punitive" wording, which would plant the idea |
 | 2026-10-03 | Posts list several contacts (name and email each, up to 10, anyone). The edit page has "Add another contact" and "Add the owners"; contacts stay separate from owners (owners edit, contacts are who to ask) |
 | 2026-10-03 | Positions can be set in advance for people who have not signed in, and in bulk from pasted lists (shareholders, then track, then all physicians). Lists never downgrade a position or change roles |
+| 2026-10-03 | Posters by request: members see Post, which asks an admin for posting access (optional note). Admins approve or decline from Admin > Manage, singly or all at once; a count by Admin in the menu shows waiting requests. Every request and decision is kept |
 | 2026-09-30 | The member directory (names, emails, positions, roles) stays readable to signed-in members, like the Outlook address book; interests, goals and history stay private to the member and admins |

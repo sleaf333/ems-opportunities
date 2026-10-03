@@ -108,7 +108,7 @@ From now on, every change merged into `main` on GitHub redeploys the site automa
 ## 6. Launch
 
 - **Invite people in batches** (about 50 a day). The free email plan allows about 300 emails a day. People stay signed in on their own devices, so after launch day, sign-in emails are rare.
-- **Approve posters:** on the **Admin** page, enter someone's email, choose **Poster** and save. They do not need to have signed in yet.
+- **Posters:** members who want to post click **Post** and request access. A number appears next to **Admin** in the menu when requests are waiting; approve or decline them (or **Approve all**) at the top of **Admin > Manage**. To make someone a poster without waiting for a request, enter their email under **Roles**, choose **Poster** and save (they do not need to have signed in yet).
 - **Shareholders** choose Shareholder as their position when they first sign in. If someone picks the wrong position, fix it on the Admin page (**Change role** on their row, tick or untick **Shareholder**, **Save**).
 - **Share the link** in the newsletter.
 

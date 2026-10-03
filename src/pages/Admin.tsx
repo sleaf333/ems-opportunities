@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { Download, Mail } from 'lucide-react'
+import { Check, Download, Mail, X } from 'lucide-react'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import AdminTabs from '../components/AdminTabs'
 import { type AdminData, BLANK_ENGAGEMENT, type Engagement, engagementByPerson, loadAdminData } from '../lib/adminData'
@@ -70,6 +70,7 @@ export default function Admin() {
         </div>
       </div>
 
+      <PostingRequests data={data} reload={reload} />
       <FullBackup data={data} reload={reload} />
       <PostingWindows opportunities={data.opportunities} />
       <MemberRoles data={data} reload={reload} draft={roleDraft} />
@@ -84,6 +85,86 @@ export default function Admin() {
         }}
       />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+// Members who asked to post. Approving makes them posters (logged as a role
+// change); declining keeps them members (they can ask again).
+function PostingRequests({ data, reload }: { data: AdminData; reload: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const requests = data.postRequests
+
+  // Opened from the menu's waiting count: bring the box into view.
+  useEffect(() => {
+    if (window.location.hash === '#requests') document.getElementById('requests')?.scrollIntoView()
+  }, [])
+
+  if (requests.length === 0) return null
+
+  async function decide(ids: number[], approve: boolean) {
+    setBusy(true)
+    setError(null)
+    const { error: rpcError } = await supabase.rpc('admin_decide_post_requests', { p_ids: ids, p_approve: approve })
+    setBusy(false)
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    await reload()
+  }
+
+  return (
+    <section id="requests" className="card stack requests-card">
+      <div className="row between wrap gap-sm">
+        <div>
+          <h2>Posting requests ({requests.length})</h2>
+          <p className="small muted">Approving lets them create posts. They can then edit only their own.</p>
+        </div>
+        {requests.length > 1 && (
+          <button className="btn btn-primary" disabled={busy} onClick={() => void decide(requests.map((r) => r.id), true)}>
+            <Check size={16} aria-hidden="true" /> Approve all ({requests.length})
+          </button>
+        )}
+      </div>
+      <ul className="list">
+        {requests.map((r) => {
+          const person = data.profiles.find((p) => p.id === r.user_id)
+          return (
+            <li key={r.id} className="row between wrap gap-sm">
+              <div>
+                <strong>{displayName(person)}</strong>
+                <span className="small muted">
+                  {person?.position ? ` · ${POSITION_LABELS[person.position]}` : ''} · asked {formatDate(r.requested_at.slice(0, 10))}
+                </span>
+                {r.note && <p className="small">"{r.note}"</p>}
+              </div>
+              <span className="row gap-sm">
+                <button
+                  className="btn btn-secondary btn-small"
+                  disabled={busy}
+                  onClick={() => void decide([r.id], true)}
+                  aria-label={`Approve ${displayName(person)}`}
+                >
+                  <Check size={14} aria-hidden="true" /> Approve
+                </button>
+                <button
+                  className="btn btn-link danger small"
+                  disabled={busy}
+                  onClick={() => void decide([r.id], false)}
+                  aria-label={`Decline ${displayName(person)}`}
+                >
+                  <X size={14} aria-hidden="true" /> Decline
+                </button>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
   )
 }
 

@@ -10,10 +10,18 @@ import {
   pageThrough,
 } from './data'
 import { supabase } from './supabase'
-import type { BackupRecord, MemberInterestCategory, MemberInterests, MemberPreset, RoleChange, SignupEvent } from './types'
+import type {
+  BackupRecord,
+  MemberInterestCategory,
+  MemberInterests,
+  MemberPreset,
+  PostRequest,
+  RoleChange,
+  SignupEvent,
+} from './types'
 
 export async function loadAdminData() {
-  const [profiles, opportunities, signups, categories, links, events, interests, memberCats, presets, roleChanges, backups] =
+  const [profiles, opportunities, signups, categories, links, events, interests, memberCats, presets, roleChanges, backups, requests] =
     await Promise.all([
       fetchProfiles(),
       fetchOpportunities(),
@@ -32,8 +40,9 @@ export async function loadAdminData() {
       pageThrough<MemberPreset>((from, to) => supabase.from('member_presets').select('*').order('email').range(from, to)),
       supabase.from('role_changes').select('*').order('id', { ascending: false }).limit(10),
       supabase.from('backup_log').select('*').order('id', { ascending: false }).limit(1),
+      supabase.from('post_requests').select('*').eq('status', 'pending').order('requested_at'),
     ])
-  for (const r of [roleChanges, backups]) if (r.error) throw new Error(r.error.message)
+  for (const r of [roleChanges, backups, requests]) if (r.error) throw new Error(r.error.message)
   return {
     profiles,
     opportunities,
@@ -46,6 +55,7 @@ export async function loadAdminData() {
     presets,
     recentRoleChanges: roleChanges.data as RoleChange[],
     lastBackup: ((backups.data as BackupRecord[])[0] ?? null) as BackupRecord | null,
+    postRequests: requests.data as PostRequest[],
   }
 }
 export type AdminData = Awaited<ReturnType<typeof loadAdminData>>
