@@ -124,6 +124,8 @@ To set many people's positions at once (for example from an Outlook distribution
 
 Run them in that order (shareholders, track, then everyone) so the most specific list wins.
 
+**Before a wider launch:** `clear_pilot_signups.sql` removes every sign-up (and its history) made by the people you paste, so pilot testers' clicks don't show on posts or in Insights. Their accounts, positions, interests and any posts stay. Download a full backup first; this cannot be undone.
+
 ## Monthly: back up the data
 
 The free Supabase plan does not include backups you can restore. Once a month, on **Admin > Manage**, click **Download full backup** and save the file to the group's OneDrive or SharePoint (never personal email or a personal drive: it contains names, emails, interests and leadership goals). The box turns yellow when the last backup is more than 30 days old. Only admins can download it, and every download is recorded.
