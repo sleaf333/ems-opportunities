@@ -5,6 +5,7 @@ import { useProfile } from '../auth/AuthContext'
 import EmailPeople, { type EmailGroup } from '../components/EmailPeople'
 import LoadError from '../components/LoadError'
 import { byId, fetchOpportunities, fetchOwners, fetchProfiles, fetchSignups, useLoader } from '../lib/data'
+import { friendlyError, supabase } from '../lib/supabase'
 import {
   displayName,
   eligibilityGroup,
@@ -109,18 +110,44 @@ function MyPost({
   canEdit: boolean
 }) {
   const [open, setOpen] = useState(false)
+  // "Contacted" ticks changed on this page, by sign-up id (null = unticked).
+  const [ticked, setTicked] = useState<Record<string, string | null>>({})
+  const [saving, setSaving] = useState<string | null>(null)
+  const [tickError, setTickError] = useState<string | null>(null)
   const expired = isExpired(opp)
-  const who = (statuses: Signup['status'][]) =>
+  const contactedAt = (s: Signup) => (s.id in ticked ? ticked[s.id] : s.contacted_at)
+  const rowsFor = (statuses: Signup['status'][]) =>
     signups
       .filter((s) => statuses.includes(s.status))
-      .map((s) => people.get(s.user_id))
-      .filter((p): p is Profile => Boolean(p))
-  const groups: EmailGroup[] = [
-    { label: 'Committed', people: who(['committed', 'completed']) },
-    { label: 'Waitlist', people: who(['waitlisted']) },
-    { label: 'Interested', people: who(['interested']) },
+      .map((s) => ({ signup: s, person: people.get(s.user_id) }))
+      .filter((r): r is { signup: Signup; person: Profile } => Boolean(r.person))
+  const sections = [
+    { label: 'Committed', rows: rowsFor(['committed', 'completed']) },
+    { label: 'Waitlist', rows: rowsFor(['waitlisted']) },
+    { label: 'Interested', rows: rowsFor(['interested']) },
   ]
+  const groups: EmailGroup[] = sections.map((g) => ({ label: g.label, people: g.rows.map((r) => r.person) }))
   const [committed, waitlist, interested] = groups
+  const waiting = sections
+    .flatMap((g) => g.rows)
+    .filter((r) => r.signup.status !== 'completed' && !contactedAt(r.signup)).length
+
+  // Shows the tick straight away, then keeps the saved time (or undoes the
+  // tick if saving failed).
+  async function setContacted(signup: Signup, value: boolean) {
+    const before = contactedAt(signup)
+    setTicked((prev) => ({ ...prev, [signup.id]: value ? (before ?? new Date().toISOString()) : null }))
+    setSaving(signup.id)
+    setTickError(null)
+    const { data, error } = await supabase.rpc('set_contacted', { p_signup_id: signup.id, p_contacted: value })
+    setSaving(null)
+    if (error) {
+      setTicked((prev) => ({ ...prev, [signup.id]: before }))
+      setTickError(friendlyError(error))
+      return
+    }
+    setTicked((prev) => ({ ...prev, [signup.id]: (data as string | null) ?? null }))
+  }
   const coOwners = owners.filter((o) => o.user_id !== me).map((o) => displayName(people.get(o.user_id)))
   const total = committed.people.length + waitlist.people.length + interested.people.length
 
@@ -156,6 +183,11 @@ function MyPost({
         <span>
           <strong>{interested.people.length}</strong> interested
         </span>
+        {waiting > 0 && (
+          <span className="waiting-count">
+            <strong>{waiting}</strong> not yet contacted
+          </span>
+        )}
       </div>
 
       <p className="small muted">
@@ -174,24 +206,50 @@ function MyPost({
       )}
 
       {open && (
-        <div className="mypost-names">
-          {groups
-            .filter((g) => g.people.length > 0)
-            .map((g) => (
-              <div key={g.label}>
-                <h4>
-                  {g.label} <span className="count">{g.people.length}</span>
-                </h4>
-                <ul>
-                  {g.people.map((p) => (
-                    <li key={p.id}>
-                      <a href={`mailto:${p.email}`}>{displayName(p)}</a>
-                      {p.position && <span className="muted"> · {POSITION_LABELS[p.position]}</span>}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+        <div className="stack-sm">
+          <p className="small muted">
+            Tick <strong>Contacted</strong> once you have reached out. Reminder emails only list people who are not
+            ticked yet.
+          </p>
+          {tickError && (
+            <p className="error" role="alert">
+              {tickError}
+            </p>
+          )}
+          <div className="mypost-names">
+            {sections
+              .filter((g) => g.rows.length > 0)
+              .map((g) => (
+                <div key={g.label}>
+                  <h4>
+                    {g.label} <span className="count">{g.rows.length}</span>
+                  </h4>
+                  <ul>
+                    {g.rows.map(({ signup, person: p }) => {
+                      const at = contactedAt(signup)
+                      return (
+                        <li key={signup.id} className="name-row">
+                          <span>
+                            <a href={`mailto:${p.email}`}>{displayName(p)}</a>
+                            {p.position && <span className="muted"> · {POSITION_LABELS[p.position]}</span>}
+                          </span>
+                          <label className="check contacted-check small">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(at)}
+                              disabled={saving === signup.id}
+                              onChange={(e) => setContacted(signup, e.target.checked)}
+                              aria-label={`Contacted ${displayName(p)}`}
+                            />
+                            {at ? `Contacted ${formatDate(at)}` : 'Contacted'}
+                          </label>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </article>

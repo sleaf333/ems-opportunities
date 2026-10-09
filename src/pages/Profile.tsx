@@ -10,6 +10,7 @@ export default function Profile() {
   const { refreshProfile } = useAuth()
   const [fullName, setFullName] = useState(profile.full_name)
   const [position, setPosition] = useState<MemberPosition>(profile.position ?? 'employed_physician')
+  const [emailOptIn, setEmailOptIn] = useState(profile.email_opt_in ?? true)
   const [categories, setCategories] = useState<InterestCategory[]>([])
   const [picked, setPicked] = useState<string[]>([])
   const [other, setOther] = useState('')
@@ -46,7 +47,10 @@ export default function Profile() {
     setMessage(null)
     setError(null)
     const [a, b] = await Promise.all([
-      supabase.from('profiles').update({ full_name: fullName.trim(), position }).eq('id', profile.id),
+      supabase
+        .from('profiles')
+        .update({ full_name: fullName.trim(), position, email_opt_in: emailOptIn })
+        .eq('id', profile.id),
       supabase.rpc('set_my_interests', { p_category_ids: picked, p_other: other, p_goals: goals }),
     ])
     setBusy(false)
@@ -123,6 +127,25 @@ export default function Profile() {
             placeholder="Roles you would like to grow into, or skills you want to build."
           />
         </label>
+      </section>
+
+      <section className="card stack-sm">
+        <h2>Email reminders</h2>
+        <label className="check check-top">
+          <input type="checkbox" checked={emailOptIn} onChange={(e) => setEmailOptIn(e.target.checked)} />
+          <span>Send me occasional reminder emails from this site</span>
+        </label>
+        <ul className="small muted tight-list">
+          <li>
+            If you own a post: a summary about every two weeks listing people who raised a hand and are not marked
+            as contacted yet. Only sent when someone is waiting.
+          </li>
+          <li>
+            If you mark Interested or Commit and no one reaches out within three weeks: one follow-up with who to
+            contact.
+          </li>
+        </ul>
+        <p className="small muted">Sign-in codes are always sent; this setting does not affect them.</p>
       </section>
 
       {error && <p className="error" role="alert">{error}</p>}

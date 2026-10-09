@@ -22,12 +22,30 @@ export default function Privacy() {
           <li>Attendance or completion, if the organizer records it.</li>
           <li>The interest topics you pick, anything else you write in, and leadership goals, if you add them.</li>
           <li>Changes to posts and to roles (poster, admin), and requests to post, with who made them, so mistakes can be undone.</li>
+          <li>
+            Whether a post's owners have ticked that they contacted you, and which reminder emails the site sent you
+            (when and about which post, not the text).
+          </li>
         </ul>
 
         <h2>What is not recorded</h2>
         <ul>
           <li>Which pages you view or what you click.</li>
           <li>Patient information of any kind. Never post it here.</li>
+        </ul>
+
+        <h2>Emails from this site</h2>
+        <ul>
+          <li>Sign-in codes, whenever you ask for one.</li>
+          <li>
+            If you own a post: a summary about every two weeks listing people who raised a hand and have not been
+            marked as contacted yet (only when someone is waiting).
+          </li>
+          <li>
+            If you mark Interested or Commit and no one has marked you as contacted after three weeks: one follow-up
+            with who to reach out to.
+          </li>
+          <li>You can turn the reminder emails off on your Profile at any time.</li>
         </ul>
 
         <h2>Who sees what</h2>

@@ -159,6 +159,42 @@ What the safety net cannot stop: someone with access to the Supabase dashboard r
 - [ ] Never use **Delete user** in Supabase.
 - [ ] Once the group relies on the site, move to Supabase Pro for automatic daily backups (see below).
 
+## Automatic emails (reminders)
+
+The site can send two kinds of reminder email. Nothing is sent until a site admin turns it on (Admin page, **Email reminders**).
+
+- **Owners:** about every two weeks, a summary of people who raised a hand on their open posts and are not ticked **Contacted** yet on My posts. Only sent when someone is waiting. Owners are spread across the 14 days, so the group's emails do not all go out on one day.
+- **Members:** one follow-up, three weeks after they mark Interested or Commit, if no owner has ticked them Contacted. It lists the post's contacts (or its owners if it has none). Sign-ups older than six weeks are never followed up, so turning emails on does not flood anyone about old sign-ups.
+- Anyone can turn these off on their **Profile**. Sign-in codes are not affected.
+- At most **150 a day** (the rest wait for the next morning), so sign-in codes always have room in Brevo's free 300.
+- A schedule inside the database runs the check every morning (about 8am in summer, 7am in winter).
+
+### One-time setup
+
+1. Run `supabase/migrations/0011_notifications.sql` (see "Applying a database update"). If Supabase asks, choose **Run without RLS**.
+2. **Brevo API key** (this is different from the SMTP key Supabase uses for sign-in codes). In Brevo, open the menu under your name, then **SMTP & API**, the **API Keys** tab, **Generate a new API key**. Name it `ems-opportunities-database` and copy it (it starts with `xkeysib-`). Never paste it into chat, email or GitHub.
+3. **Save the key in the Supabase Vault.** In Supabase, open **Integrations**, then **Vault** (in some versions it is under **Project Settings**), then **Add new secret**. Name: `brevo_api_key` (exactly). Secret: paste the key. Save. Using this screen keeps the key out of the SQL editor's saved history.
+   - If you cannot find the Vault screen, run this in the SQL editor instead, then delete that query from the editor's list of saved queries:
+     `select vault.create_secret('PASTE-THE-KEY-HERE', 'brevo_api_key');`
+4. **Set the sender.** Use the same From address as your sign-in emails (Supabase, **Authentication**, **Emails**, **SMTP Settings**, Sender email). IT has already allowed it. In the SQL editor:
+
+   ```sql
+   update public.notification_settings set sender_email = 'the-same-sender@address' where id;
+   ```
+
+5. On the site, open **Admin**, find **Email reminders**. All three lines should have a green tick. Click **Send me a test email**, check your inbox (and junk), then press **Refresh**: it should say "Accepted by Brevo".
+   - **Failed (401)** means Brevo refused the key. Check that the Vault secret is named exactly `brevo_api_key` and holds the API key (not the SMTP key). If the reason mentions an unrecognised IP address, open Brevo, **Security**, **Authorised IPs**, and either add the address it shows or turn that blocking off. The emails come from Supabase's servers, whose address can change.
+6. Click **Turn on**. The first emails go out the next morning.
+
+### Good to know
+
+- **Launch days:** if a big group will sign in on the same day, consider leaving reminders off (or lowering the daily limit) until the sign-ins settle, so codes never run short.
+- Brevo may track opens and clicks on these emails by default. If you would rather not, look in Brevo's transactional email settings for tracking options.
+- **Change the timing or limit** (SQL editor): `update public.notification_settings set daily_cap = 100 where id;` (also `digest_every_days`, 7 to 28, and `nudge_after_days`, 7 to 60).
+- **New web address:** if the site moves to a custom domain, update the links in emails: `update public.notification_settings set site_url = 'https://new.address' where id;`
+- **Replace the key:** edit the `brevo_api_key` secret on the Vault screen.
+- The Admin card lists the last 20 emails and whether Brevo accepted them. The text of emails is not stored.
+
 ## If the site stops loading data
 
 Free Supabase projects pause after about a week with no activity. If the site shows errors, sign in to Supabase and click **Restore project** on the dashboard. No data is lost. This is unlikely while the group uses the site regularly.
@@ -171,7 +207,7 @@ Nothing needs to be rebuilt to upgrade. These are monthly or yearly costs; none 
 |---|---|---|
 | Custom web address (e.g. `emsopportunities.org`) | Easier to remember; can be bought through Cloudflare | $10 to $15 a year |
 | Supabase Pro | No pausing, daily backups | About $25 a month |
-| Brevo paid plan | Only if you add automatic digest emails to everyone | Varies |
+| Brevo paid plan | Only if reminder emails plus sign-in codes outgrow 300 a day | Varies |
 
 Check current prices before buying; they change.
 

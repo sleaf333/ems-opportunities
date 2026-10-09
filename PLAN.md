@@ -72,7 +72,8 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 - [x] Admin Insights ("Leadership pipeline"): engagement funnel, activity by month, rising stars, interest heatmap by location and by position, and gaps (topics wanted with no post, quiet posts, locations with nothing open), filterable by time range and position
 
 ### Phase 3: Optional extras
-- [ ] Automatic weekly email digest (only if manual newsletter links fall short; see the email limits under "Technology")
+- [ ] Automatic weekly email digest of new posts to everyone (only if manual newsletter links fall short; see the email limits under "Technology")
+- [x] Reminder emails (built, off until an admin turns them on): owners get a summary about every two weeks of people not yet ticked Contacted; members get one follow-up three weeks after signing up if nobody ticked them; opt-out on Profile; at most 150 a day
 - [ ] Calendar invite (.ics) for event-type opportunities
 
 ## Engagement data and privacy
@@ -187,4 +188,5 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-10-03 | Posters by request: members see Post, which asks an admin for posting access (optional note). Admins approve or decline from Admin > Manage, singly or all at once; a count by Admin in the menu shows waiting requests. Every request and decision is kept |
 | 2026-10-03 | "Admin" role relabelled "Site admin" and "role" shown as "site role", to keep it apart from the Administrative staff position. Granting Site admin asks for confirmation, and the Admin page lists current site admins. Site admins are kept to about three people |
 | 2026-10-09 | Pilot fixes: confirmations happen on the page, never as browser pop-ups (blocked in the Outlook app on iPhone, which broke Withdraw); page loads retry automatically and show "Try again" instead of a dead end |
+| 2026-10-09 | Reminder emails, changing the earlier "no automatic emails" stance for these two cases only. Owners tick "Contacted" per person on My posts (the site cannot otherwise know); owners get a summary about every two weeks listing people not yet ticked, spread across the 14 days so sends do not pile onto one day, and only when someone is waiting (no daily digest). Members get one follow-up after three weeks if not ticked. Anyone can turn these off on Profile. Sent from the database (pg_cron + pg_net) through Brevo's API, at most 150 a day so sign-in codes keep room in the free 300; the Brevo key lives in the Supabase Vault. Off until an admin turns it on |
 | 2026-09-30 | The member directory (names, emails, positions, roles) stays readable to signed-in members, like the Outlook address book; interests, goals and history stay private to the member and admins |

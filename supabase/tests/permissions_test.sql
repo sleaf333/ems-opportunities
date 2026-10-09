@@ -608,7 +608,7 @@ set request.jwt.claim.sub = :'admin';
 set role authenticated;
 select tests.eq(
   (select string_agg(k, ',' order by k) from jsonb_object_keys(public.admin_export_all()) k),
-  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,post_requests,profiles,role_changes,schema_version,signup_events,signups',
+  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,notification_log,notification_settings,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,post_requests,profiles,role_changes,schema_version,signup_events,signups',
   'backup has every table');
 select tests.eq(
   (select jsonb_array_length(public.admin_export_all() -> 'signup_events')::text),
@@ -618,7 +618,7 @@ reset role;
 -- If this fails, a new table was added: put it in admin_export_all.
 select tests.eq(
   (select count(*)::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'),
-  '15', 'backup covers every table in the database');
+  '17', 'backup covers every table in the database');
 
 -- Deleting people or posts with activity is blocked (as the Supabase dashboard would).
 select tests.expect_error(format($$delete from auth.users where id = %L$$, :'doc'), '%violates foreign key constraint%');
@@ -777,5 +777,194 @@ set role authenticated;
 select public.admin_decide_post_requests(array(select id from public.post_requests where user_id = :'req2' and status = 'pending'), true);
 reset role;
 select tests.eq((select role::text from public.profiles where id = :'req2'), 'admin', 'approval leaves admins as admins');
+
+-- ---------------------------------------------------------------------------
+-- Automatic emails (0011)
+-- ---------------------------------------------------------------------------
+
+\set own1 'a0000000-0000-0000-0000-000000000021'
+\set mem1 'a0000000-0000-0000-0000-000000000022'
+\set mem2 'a0000000-0000-0000-0000-000000000023'
+\set mem3 'a0000000-0000-0000-0000-000000000024'
+\set mem4 'a0000000-0000-0000-0000-000000000025'
+insert into auth.users (id, email) values
+  (:'own1', 'owner.one@ems-wi.com'), (:'mem1', 'mem.one@ems-wi.com'), (:'mem2', 'mem.two@ems-wi.com'),
+  (:'mem3', 'mem.three@ems-wi.com'), (:'mem4', 'mem.four@ems-wi.com');
+update public.profiles set full_name = 'Olive Owner', role = 'poster', position = 'partner' where id = :'own1';
+update public.profiles set full_name = 'Mia <One>', position = 'employed_physician' where id = :'mem1';
+update public.profiles set full_name = 'Max Two', position = 'apc' where id = :'mem2';
+update public.profiles set full_name = 'Meg Three', position = 'admin_staff' where id = :'mem3';
+update public.profiles set full_name = 'Moe Four', position = 'employed_physician' where id = :'mem4';
+
+insert into public.opportunities (title, region, created_by, contacts)
+values ('Email test post', 'milwaukee', :'own1', '[{"name": "Chair Person", "email": "chair@ems-wi.com"}]');
+select id as mail_id from public.opportunities where title = 'Email test post' \gset
+insert into public.opportunities (title, region, created_by) values ('No contact post', 'milwaukee', :'own1');
+select id as nocontact_id from public.opportunities where title = 'No contact post' \gset
+
+select tests.eq((select count(*)::text from cron.job where jobname in ('ems-daily-notifications', 'ems-notification-results')), '2', 'daily check and results are scheduled');
+select tests.eq((select enabled::text || ',' || daily_cap from public.notification_settings), 'false,150', 'emails start turned off');
+select tests.eq((select bool_and(email_opt_in)::text from public.profiles), 'true', 'everyone starts opted in');
+
+set request.jwt.claim.sub = :'mem1';
+set role authenticated;
+select public.set_my_signup(:'mail_id', 'interested');
+select public.set_my_signup(:'nocontact_id', 'interested');
+reset role;
+set request.jwt.claim.sub = :'mem2';
+set role authenticated;
+select public.set_my_signup(:'mail_id', 'committed');
+reset role;
+set request.jwt.claim.sub = :'mem3';
+set role authenticated;
+select public.set_my_signup(:'mail_id', 'interested');
+-- Turning emails off on the Profile; only your own row.
+update public.profiles set email_opt_in = false where id = auth.uid();
+update public.profiles set email_opt_in = false where id = :'mem1';
+reset role;
+select tests.eq((select string_agg(full_name || '=' || email_opt_in, ',' order by full_name) from public.profiles where id in (:'mem1', :'mem3')), 'Meg Three=false,Mia <One>=true', 'members turn off only their own emails');
+select count(*) as events_before from public.signup_events \gset
+
+-- Contacted: owners and admins only, and it is not a status change.
+select id as mem1_signup from public.signups where user_id = :'mem1' and opportunity_id = :'mail_id' \gset
+select id as mem2_signup from public.signups where user_id = :'mem2' and opportunity_id = :'mail_id' \gset
+set request.jwt.claim.sub = :'mem1';
+set role authenticated;
+select tests.expect_error(format($$select public.set_contacted(%L, true)$$, :'mem2_signup'), 'Only the post''s owners or an admin%');
+select tests.expect_error(format($$update public.signups set contacted_at = now() where id = %L$$, :'mem1_signup'), 'permission denied%');
+select tests.expect_error($$select * from public.notification_settings$$, 'permission denied%');
+select tests.eq((select count(*)::text from public.notification_log), '0', 'members cannot read the email log');
+select tests.expect_error($$select public.run_daily_notifications()$$, 'permission denied%');
+select tests.expect_error($$select public.send_email('a@b.c', 'x', 'x', 'x')$$, 'permission denied%');
+select tests.expect_error($$select public.record_notification_results()$$, 'permission denied%');
+select tests.expect_error($$select public.admin_notification_status()$$, 'Only admins%');
+select tests.expect_error($$select public.admin_set_notifications(true)$$, 'Only admins%');
+select tests.expect_error($$select public.admin_send_test_email()$$, 'Only admins%');
+reset role;
+set role anon;
+select tests.expect_error(format($$select public.set_contacted(%L, true)$$, :'mem2_signup'), 'permission denied%');
+reset role;
+
+set request.jwt.claim.sub = :'own1';
+set role authenticated;
+select tests.eq((public.set_contacted(:'mem2_signup', true) is not null)::text, 'true', 'owner ticks Contacted');
+select tests.eq((select contacted_by::text from public.signups where id = :'mem2_signup'), :'own1', 'who ticked it is kept');
+select public.set_contacted(:'mem1_signup', true)::text as ticked_at \gset
+select tests.eq((select contacted_at::text from public.signups where id = :'mem1_signup'), :'ticked_at', 'tick returns the time');
+select tests.eq(coalesce(public.set_contacted(:'mem1_signup', false)::text, '-'), '-', 'owner unticks');
+reset role;
+select tests.eq((select coalesce(contacted_at::text, '-') || ',' || coalesce(contacted_by::text, '-') from public.signups where id = :'mem1_signup'), '-,-', 'unticking clears it');
+select tests.eq((select count(*)::text from public.signup_events), :'events_before', 'Contacted adds nothing to sign-up history');
+
+-- Turned off, or not set up: nothing is sent.
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.eq((select (public.admin_notification_status() ->> 'enabled') || ',' || (public.admin_notification_status() ->> 'has_key') || ',' || (public.admin_notification_status() ->> 'scheduled')), 'false,false,true', 'admin sees emails are off and no key yet');
+select tests.expect_error($$select public.admin_set_notifications(true)$$, 'Add the Brevo API key%');
+select tests.expect_error($$select public.admin_send_test_email()$$, 'Add the Brevo API key%');
+reset role;
+select tests.eq(public.run_daily_notifications()::text, '{"enabled": false}', 'nothing runs while emails are off');
+select tests.eq((select count(*)::text from net.sent), '0', 'nothing sent');
+
+-- Set up: key in the Vault, sender, switch on.
+insert into vault.secrets (name, secret) values ('brevo_api_key', 'test-key');
+update public.notification_settings set sender_email = 'sender@example.com';
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_notifications(true);
+select public.admin_send_test_email();
+select tests.eq((public.admin_notification_status() ->> 'ready'), 'true', 'admin sees emails are ready');
+select tests.eq((select count(*)::text from public.notification_log where kind = 'setting'), '1', 'admin can read the email log');
+reset role;
+select tests.eq((select body #>> '{to,0,email}' from net.sent order by id desc limit 1), 'boss@ems-wi.com', 'test email goes to the admin');
+select tests.eq((select headers ->> 'api-key' from net.sent order by id desc limit 1), 'test-key', 'key read from the Vault');
+select tests.eq((select body #>> '{sender,email}' from net.sent order by id desc limit 1), 'sender@example.com', 'sent from the set sender');
+select max(id) as test_req from net.sent \gset
+
+-- Owner digest on the owner's day of the cycle (at least 14 days out, so
+-- digests from the runs below cannot block it).
+select (date '2026-01-05' + s.slot + 14 * ceil((public.local_today() + 14 - date '2026-01-05' - s.slot) / 14.0)::integer)::text as digest_day
+from (select mod(('x' || substr(md5(:'own1'), 1, 7))::bit(28)::integer, 14) as slot) s \gset
+select (:'digest_day' || ' 08:00 America/Chicago') as digest_at \gset
+-- (Members' emails are paused here so these future runs send no follow-ups.)
+update public.profiles set email_opt_in = false where id in (:'mem1', :'mem2');
+select public.run_daily_notifications(:'digest_at');
+select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '1', 'owner gets a digest on their day');
+select tests.eq((select details ->> 'people' from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '3', 'digest lists people not yet contacted (opted-out members too)');
+select tests.eq((select body ->> 'subject' from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com'), 'EMS Opportunities: 3 people to reach out to', 'digest subject');
+select body ->> 'htmlContent' as digest_html from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' \gset
+select tests.eq((position('Mia &lt;One&gt;' in :'digest_html') > 0)::text, 'true', 'names are escaped');
+select tests.eq((position('Max Two' in :'digest_html') > 0)::text, 'false', 'contacted people are left out');
+select tests.eq((position('(new)' in :'digest_html') > 0)::text, 'true', 'first digest marks people new');
+select tests.eq((position('No contact post' in :'digest_html') > 0 and position('/my-posts' in :'digest_html') > 0)::text, 'true', 'digest covers every open post and links to My posts');
+
+select public.run_daily_notifications(:'digest_at');
+select public.run_daily_notifications((:'digest_at')::timestamptz + interval '1 day');
+select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '1', 'no repeat digest within the cycle');
+select public.run_daily_notifications((:'digest_at')::timestamptz + interval '14 days');
+select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '2', 'next digest two weeks later');
+select tests.eq((select (position('(new)' in body ->> 'htmlContent') > 0)::text from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' order by id desc limit 1), 'false', 'nobody new since the last digest');
+update public.profiles set email_opt_in = false where id = :'own1';
+select public.run_daily_notifications((:'digest_at')::timestamptz + interval '28 days');
+update public.profiles set email_opt_in = true where id = :'own1';
+select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '2', 'opted-out owners get no digest');
+update public.opportunities set status = 'closed' where id in (:'mail_id', :'nocontact_id');
+select public.run_daily_notifications((:'digest_at')::timestamptz + interval '42 days');
+update public.opportunities set status = 'open' where id in (:'mail_id', :'nocontact_id');
+select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '2', 'no digest when nobody is waiting on an open post');
+select tests.eq((select count(*)::text from public.signups where nudged_at is not null and user_id in (:'mem1', :'mem2', :'mem3')), '0', 'no follow-ups to opted-out members');
+update public.profiles set email_opt_in = true where id in (:'mem1', :'mem2');
+
+-- Member follow-up three weeks after signing up, once, if not contacted.
+set request.jwt.claim.sub = :'mem4';
+set role authenticated;
+select public.set_my_signup(:'mail_id', 'interested');
+reset role;
+update public.signups set status_changed_at = now() - interval '22 days' where user_id in (:'mem1', :'mem2', :'mem3');
+update public.signups set status_changed_at = now() - interval '60 days' where user_id = :'mem4';
+select count(*) as sent_before from net.sent \gset
+select public.run_daily_notifications();
+select tests.eq((select string_agg(body #>> '{to,0,email}' || ':' || (body ->> 'subject'), ',' order by body #>> '{to,0,email}', body ->> 'subject') from net.sent where id > :sent_before and body ->> 'subject' like 'Following up%'),
+  'mem.one@ems-wi.com:Following up: Email test post,mem.one@ems-wi.com:Following up: No contact post', 'only the waiting, opted-in member is followed up');
+select tests.eq((select (position('Chair Person' in body ->> 'htmlContent') > 0 and position('Olive Owner' in body ->> 'htmlContent') = 0)::text from net.sent where body ->> 'subject' = 'Following up: Email test post'), 'true', 'follow-up lists the post''s contacts');
+select tests.eq((select (position('Olive Owner' in body ->> 'htmlContent') > 0)::text from net.sent where body ->> 'subject' = 'Following up: No contact post'), 'true', 'no contacts: lists the owners');
+select tests.eq((select (nudged_at is not null)::text from public.signups where id = :'mem1_signup'), 'true', 'follow-up is recorded');
+select tests.eq((select count(*)::text from public.signups where nudged_at is not null and user_id in (:'mem2', :'mem3', :'mem4')), '0', 'contacted, opted-out and old sign-ups are not followed up');
+select tests.eq((select count(*)::text from public.signup_events), (:'events_before'::integer + 1)::text, 'follow-ups add nothing to sign-up history');
+select count(*) as sent_before from net.sent \gset
+select public.run_daily_notifications();
+select tests.eq((select count(*)::text from net.sent where id > :sent_before and body ->> 'subject' like 'Following up%'), '0', 'only one follow-up per sign-up');
+
+-- Daily limit: anything over waits for the next day.
+update public.signups set status_changed_at = now() - interval '22 days' where user_id = :'mem4';
+update public.notification_settings set daily_cap = public.emails_sent_on(public.local_today());
+select tests.eq(((public.run_daily_notifications() ->> 'skipped_for_limit')::integer >= 1)::text, 'true', 'over the daily limit is skipped');
+select tests.eq((select coalesce(nudged_at::text, '-') from public.signups where user_id = :'mem4'), '-', 'skipped follow-up not marked');
+update public.notification_settings set daily_cap = 150;
+select public.run_daily_notifications();
+select tests.eq((select (nudged_at is not null)::text from public.signups where user_id = :'mem4'), 'true', 'sent once there is room');
+
+-- Brevo's answers are copied onto the log.
+select request_id as nudge_req from public.notification_log where kind = 'member_nudge' and user_id = :'mem1' order by id limit 1 \gset
+insert into net._http_response (id, status_code, content) values
+  (:'nudge_req', 201, '{"messageId": "x"}'), (:'test_req', 401, '{"message": "Key not found"}');
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.eq((select (s ->> 'sent_14d') || ',' || (s ->> 'failed_14d') from (select public.admin_notification_status() s) x), '1,1', 'admin sees sent and failed emails');
+select tests.eq((select x ->> 'error' from jsonb_array_elements(public.admin_notification_status() -> 'recent') x where x ->> 'kind' = 'test'), '{"message": "Key not found"}', 'admin sees why an email failed');
+reset role;
+
+-- A run that fails changes nothing and leaves a note.
+delete from vault.secrets where name = 'brevo_api_key';
+select tests.eq((public.run_daily_notifications() ? 'error')::text, 'true', 'run without a key reports an error');
+select tests.eq((select status || ',' || error from public.notification_log where kind = 'run' order by id desc limit 1), 'failed,The Brevo API key or sender is missing', 'failed run is logged');
+
+-- Switching off.
+insert into vault.secrets (name, secret) values ('brevo_api_key', 'test-key');
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_notifications(false);
+reset role;
+select tests.eq(public.run_daily_notifications()::text, '{"enabled": false}', 'switched off');
 
 \o

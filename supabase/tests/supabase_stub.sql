@@ -63,3 +63,54 @@ end;
 $$;
 
 grant execute on all functions in schema tests to anon, authenticated;
+
+-- Stand-ins for pg_net (web requests), Vault (secrets) and pg_cron (schedule)
+-- so the email code can be tested without sending anything. net.sent keeps
+-- each request; tests write Brevo's answers into net._http_response.
+create schema net;
+create table net.sent (
+  id bigint generated always as identity primary key,
+  url text,
+  body jsonb,
+  headers jsonb,
+  sent_at timestamptz not null default now()
+);
+create table net._http_response (
+  id bigint,
+  status_code integer,
+  content_type text,
+  headers jsonb,
+  content text,
+  timed_out boolean,
+  error_msg text,
+  created timestamptz not null default now()
+);
+create function net.http_post(
+  url text, body jsonb default '{}', params jsonb default '{}',
+  headers jsonb default '{}', timeout_milliseconds integer default 5000
+) returns bigint
+language sql
+as $$ insert into net.sent (url, body, headers) values (url, body, headers) returning id $$;
+
+create schema vault;
+create table vault.secrets (
+  id uuid primary key default gen_random_uuid(),
+  name text unique,
+  secret text
+);
+create view vault.decrypted_secrets as select id, name, secret as decrypted_secret from vault.secrets;
+
+create schema cron;
+create table cron.job (
+  jobid bigint generated always as identity primary key,
+  jobname text unique,
+  schedule text,
+  command text
+);
+create function cron.schedule(job_name text, schedule text, command text) returns bigint
+language sql
+as $$
+  insert into cron.job (jobname, schedule, command) values (job_name, schedule, command)
+  on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command
+  returning jobid
+$$;

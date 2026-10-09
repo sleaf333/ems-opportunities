@@ -56,4 +56,9 @@ select tests.eq((select count(*)::text from public.opportunity_history where 'co
 -- 0009: existing Shareholder advance settings carry over as a position.
 select tests.eq((select coalesce(position::text, '-') from public.member_presets where email = 'pending@ems-wi.com'), 'partner', 'shareholder preset became a preset position');
 
+-- 0011: existing people are opted in, nobody is marked contacted, emails start off.
+select tests.eq((select bool_and(email_opt_in)::text from public.profiles), 'true', 'existing members opted in to emails');
+select tests.eq((select count(*)::text from public.signups where contacted_at is not null or nudged_at is not null), '0', 'existing sign-ups not marked contacted');
+select tests.eq((select enabled::text from public.notification_settings), 'false', 'emails start turned off');
+
 \o

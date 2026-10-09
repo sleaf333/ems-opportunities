@@ -25,7 +25,7 @@ const DAY = 86_400_000
 const daysAgo = (n: number) => new Date(TODAY.getTime() - n * DAY).toISOString()
 
 function person(id: string, position: MemberPosition): Profile {
-  return { id, email: `${id}@ems-wi.com`, full_name: id, position, role: 'member', created_at: daysAgo(400) }
+  return { id, email: `${id}@ems-wi.com`, full_name: id, position, role: 'member', email_opt_in: true, created_at: daysAgo(400) }
 }
 
 function opp(id: string, extra: Partial<Opportunity> = {}): Opportunity {
@@ -80,6 +80,9 @@ function signup(user: string, oppId: string, status: SignupStatus): Signup {
     status,
     status_changed_at: daysAgo(1),
     created_at: daysAgo(1),
+    contacted_at: null,
+    contacted_by: null,
+    nudged_at: null,
   }
 }
 
