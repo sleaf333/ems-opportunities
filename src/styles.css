@@ -1813,10 +1813,81 @@ tr.expanded td {
   gap: 0.3rem;
   font-size: 0.93rem;
 }
+/* My posts: each name with its Contacted tick */
+.mypost-names li.name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.15rem 0.75rem;
+}
+.mypost-names li.name-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.contacted-check {
+  color: var(--muted);
+}
+.count-row .waiting-count strong {
+  color: var(--brand);
+}
+.tight-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+}
 .owners-panel .owner-name {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Admin: email reminders */
+.badge-on {
+  background: var(--success-soft);
+  color: var(--success);
+  vertical-align: middle;
+}
+.badge-off {
+  vertical-align: middle;
+}
+.setup-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+}
+.setup-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  overflow-wrap: anywhere;
+}
+.setup-checks li svg {
+  flex: none;
+  margin-top: 0.2rem;
+}
+.setup-checks .ok svg {
+  color: var(--success);
+}
+.setup-checks .todo svg {
+  color: var(--danger);
+}
+.email-log {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.email-log-error {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
 }
 
 /* Admin: full backup and edit history */

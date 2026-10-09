@@ -3,6 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Check, Download, Mail, X } from 'lucide-react'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import AdminTabs from '../components/AdminTabs'
+import EmailReminders from '../components/EmailReminders'
 import LoadError from '../components/LoadError'
 import { type AdminData, BLANK_ENGAGEMENT, type Engagement, engagementByPerson, loadAdminData } from '../lib/adminData'
 import { byId, useLoader } from '../lib/data'
@@ -73,6 +74,7 @@ export default function Admin() {
 
       <PostingRequests data={data} reload={reload} />
       <FullBackup data={data} reload={reload} />
+      <EmailReminders />
       <PostingWindows opportunities={data.opportunities} />
       <MemberRoles data={data} reload={reload} draft={roleDraft} />
       <Interests data={data} />

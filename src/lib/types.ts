@@ -19,6 +19,8 @@ export interface Profile {
   full_name: string
   position: MemberPosition | null
   role: UserRole
+  // Automatic emails (0011); people turn them off on their Profile.
+  email_opt_in: boolean
   created_at: string
 }
 
@@ -146,6 +148,11 @@ export interface Signup {
   status: SignupStatus
   status_changed_at: string
   created_at: string
+  // Owners tick "Contacted" once they reach out (0011); nudged_at is when the
+  // member got their one follow-up email.
+  contacted_at: string | null
+  contacted_by: string | null
+  nudged_at: string | null
 }
 
 export interface SignupEvent {

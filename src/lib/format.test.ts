@@ -8,6 +8,7 @@ const member = (position: MemberPosition): Profile => ({
   full_name: 'X',
   position,
   role: 'member',
+  email_opt_in: true,
   created_at: '2026-01-01T00:00:00Z',
 })
 const post = (eligible_positions: MemberPosition[]) => ({ eligible_positions }) as Opportunity
