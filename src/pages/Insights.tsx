@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
 import AdminTabs from '../components/AdminTabs'
+import LoadError from '../components/LoadError'
 import Funnel from '../components/insights/Funnel'
 import Gaps from '../components/insights/Gaps'
 import Heatmap from '../components/insights/Heatmap'
@@ -30,7 +31,7 @@ import {
 
 export default function Insights() {
   const profile = useProfile()
-  const { data, error, loading } = useLoader(loadAdminData, [])
+  const { data, error, loading, reload } = useLoader(loadAdminData, [])
   const [range, setRange] = useState<Range>('12m')
   const [filter, setFilter] = useState<PositionFilter>('all')
   const [heatView, setHeatView] = useState<'location' | 'position'>('location')
@@ -53,7 +54,7 @@ export default function Insights() {
   }, [data, range, filter, today])
 
   if (profile.role !== 'admin') return <Navigate to="/" replace />
-  if (error) return <p className="error">Could not load insights: {error}</p>
+  if (error) return <LoadError what="insights" error={error} onRetry={reload} />
 
   const members = computed?.funnel.stages[0]?.count ?? 0
   const raised = computed?.funnel.stages[1]?.count ?? 0

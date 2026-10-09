@@ -3,6 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Check, Download, Mail, X } from 'lucide-react'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import AdminTabs from '../components/AdminTabs'
+import LoadError from '../components/LoadError'
 import { type AdminData, BLANK_ENGAGEMENT, type Engagement, engagementByPerson, loadAdminData } from '../lib/adminData'
 import { byId, useLoader } from '../lib/data'
 import { downloadCsv, downloadJson, toCsv } from '../lib/csv'
@@ -44,7 +45,7 @@ export default function Admin() {
   const engagement = useMemo(() => (data ? engagementByPerson(data) : new Map<string, Engagement>()), [data])
 
   if (profile.role !== 'admin') return <Navigate to="/" replace />
-  if (error) return <p className="error">Could not load admin data: {error}</p>
+  if (error) return <LoadError what="admin data" error={error} onRetry={reload} />
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
@@ -301,6 +302,7 @@ function MemberRoles({
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<UserRole>('poster')
   const [partner, setPartner] = useState(false)
+  const [ackAdmin, setAckAdmin] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -311,6 +313,7 @@ function MemberRoles({
     setEmail(draft.email)
     setRole(draft.role)
     setPartner(draft.partner)
+    setAckAdmin(false)
     setMessage(null)
     setError(null)
   }, [draft])
@@ -324,16 +327,9 @@ function MemberRoles({
       setError(`Email must end in @${EMAIL_DOMAIN}.`)
       return
     }
-    // Granting site admin is rare and powerful: confirm it.
-    const current =
-      data.profiles.find((x) => x.email === address)?.role ?? data.presets.find((x) => x.email === address)?.role
-    if (
-      role === 'admin' &&
-      current !== 'admin' &&
-      !window.confirm(
-        `Make ${address} a site admin?\n\nSite admins can see and export everything (interests, leadership goals, all history), download full backups and change anyone's site role. Keep this to a few people.`,
-      )
-    ) {
+    // Granting site admin is rare and powerful: it needs the box ticked.
+    if (grantingAdmin && !ackAdmin) {
+      setError('Tick the box to confirm you want to make this person a site admin.')
       return
     }
     setBusy(true)
@@ -353,9 +349,16 @@ function MemberRoles({
         : `Saved. ${address} will get this the first time they sign in.`,
     )
     setEmail('')
+    setAckAdmin(false)
     await reload()
     if (address === profile.email) await refreshProfile()
   }
+
+  // Is this save about to make someone a site admin who isn't one yet?
+  const typed = email.trim().toLowerCase()
+  const currentRole =
+    data.profiles.find((x) => x.email === typed)?.role ?? data.presets.find((x) => x.email === typed)?.role
+  const grantingAdmin = role === 'admin' && currentRole !== 'admin'
 
   async function removePreset(presetEmail: string) {
     const { error: deleteError } = await supabase.from('member_presets').delete().eq('email', presetEmail)
@@ -388,14 +391,23 @@ function MemberRoles({
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setAckAdmin(false)
+            }}
             placeholder={`name@${EMAIL_DOMAIN}`}
             required
           />
         </label>
         <label className="field">
           <span>Site role</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+          <select
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value as UserRole)
+              setAckAdmin(false)
+            }}
+          >
             {Object.entries(ROLE_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}
@@ -406,6 +418,19 @@ function MemberRoles({
           Shareholder
         </label>
       </div>
+      {grantingAdmin && (
+        <div className="confirm-inline">
+          <p className="small">
+            <strong>Making {typed || 'this person'} a site admin.</strong> Site admins can see and export everything
+            (interests, leadership goals, all history), download full backups and change anyone's site role. Keep
+            this to a few people.
+          </p>
+          <label className="check">
+            <input type="checkbox" checked={ackAdmin} onChange={(e) => setAckAdmin(e.target.checked)} />
+            I understand, make them a site admin
+          </label>
+        </div>
+      )}
       <div>
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
       </div>
@@ -622,11 +647,24 @@ function Topics({ data, reload }: { data: AdminData; reload: () => Promise<void>
     await reload()
   }
 
-  async function rename(c: InterestCategory) {
-    const next = window.prompt(`Rename "${c.name}" to:`, c.name)?.trim()
-    if (!next || next === c.name) return
+  // Renaming happens in a small box on the topic itself (no browser pop-up).
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null)
+
+  async function saveRename(event: FormEvent) {
+    event.preventDefault()
+    if (!renaming) return
+    const c = data.categories.find((x) => x.id === renaming.id)
+    const next = renaming.value.trim()
+    if (!c || !next || next === c.name) {
+      setRenaming(null)
+      return
+    }
     const { error: updateError } = await supabase.from('interest_categories').update({ name: next }).eq('id', c.id)
-    if (updateError) setError(friendlyError(updateError))
+    if (updateError) {
+      setError(/duplicate/i.test(updateError.message) ? `"${next}" already exists.` : friendlyError(updateError))
+      return
+    }
+    setRenaming(null)
     await reload()
   }
 
@@ -660,10 +698,28 @@ function Topics({ data, reload }: { data: AdminData; reload: () => Promise<void>
       <div className="chips">
         {data.categories.map((c) => (
           <span key={c.id} className={`topic-chip ${c.active ? '' : 'topic-retired'}`}>
-            <span>{c.name}</span>
-            <button type="button" className="btn btn-link" onClick={() => void rename(c)}>
-              Rename
-            </button>
+            {renaming?.id === c.id ? (
+              <form className="rename-form" onSubmit={(e) => void saveRename(e)}>
+                <input
+                  autoFocus
+                  aria-label={`New name for ${c.name}`}
+                  value={renaming.value}
+                  maxLength={60}
+                  onChange={(e) => setRenaming({ id: c.id, value: e.target.value })}
+                />
+                <button className="btn btn-link">Save</button>
+                <button type="button" className="btn btn-link" onClick={() => setRenaming(null)}>
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <>
+                <span>{c.name}</span>
+                <button type="button" className="btn btn-link" onClick={() => setRenaming({ id: c.id, value: c.name })}>
+                  Rename
+                </button>
+              </>
+            )}
             <button type="button" className="btn btn-link" onClick={() => void setActive(c, !c.active)}>
               {c.active ? 'Retire' : 'Restore'}
             </button>

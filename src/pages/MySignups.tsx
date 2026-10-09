@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
 import { SignupBadge } from '../components/Badges'
+import LoadError from '../components/LoadError'
 import { byId, fetchOpportunities, useLoader } from '../lib/data'
 import { formatDate, locationText, TYPE_LABELS } from '../lib/format'
 import { supabase } from '../lib/supabase'
@@ -9,7 +10,7 @@ import type { Opportunity, Signup } from '../lib/types'
 
 export default function MySignups() {
   const profile = useProfile()
-  const { data, error, loading } = useLoader(async () => {
+  const { data, error, loading, reload } = useLoader(async () => {
     const [opps, mine] = await Promise.all([
       fetchOpportunities(),
       supabase.from('signups').select('*').eq('user_id', profile.id).order('status_changed_at', { ascending: false }),
@@ -18,7 +19,7 @@ export default function MySignups() {
     return [opps, mine.data as Signup[]] as const
   }, [profile.id])
 
-  if (error) return <p className="error">Could not load your sign-ups: {error}</p>
+  if (error) return <LoadError what="your sign-ups" error={error} onRetry={reload} />
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
