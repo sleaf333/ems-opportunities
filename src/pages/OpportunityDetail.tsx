@@ -21,9 +21,11 @@ import { Avatar } from '../components/Avatars'
 import { SignupBadge } from '../components/Badges'
 import OppIcon from '../components/OppIcon'
 import Celebrate from '../components/Celebrate'
+import ConfirmAction from '../components/ConfirmAction'
 import CountUp from '../components/CountUp'
 import Description from '../components/Description'
 import EmailPeople from '../components/EmailPeople'
+import LoadError from '../components/LoadError'
 import {
   byId,
   categoriesByOpportunity,
@@ -96,7 +98,7 @@ export default function OpportunityDetail() {
   const [rippleKey, setRippleKey] = useState(0)
   const statusRef = useRef<HTMLElement>(null)
 
-  if (error) return <p className="error">Could not load this opportunity: {error}</p>
+  if (error) return <LoadError what="this opportunity" error={error} onRetry={reload} />
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
@@ -131,7 +133,6 @@ export default function OpportunityDetail() {
   const full = opp.capacity !== null && committedCount >= opp.capacity
 
   async function change(status: SignupStatus) {
-    if (status === 'withdrawn' && current === 'committed' && !window.confirm('Give up your spot?')) return
     setBusy(true)
     setActionError(null)
     setNotice(null)
@@ -310,9 +311,20 @@ export default function OpportunityDetail() {
                     Change to just interested
                   </button>
                 )}
-                {current && current !== 'withdrawn' && (
+                {current === 'committed' && (
+                  <ConfirmAction
+                    label="Withdraw"
+                    question="Give up your spot?"
+                    detail={opp.capacity ? 'If anyone is on the waitlist, the next person gets it.' : undefined}
+                    confirmLabel="Yes, give up my spot"
+                    cancelLabel="Keep it"
+                    disabled={busy}
+                    onConfirm={() => change('withdrawn')}
+                  />
+                )}
+                {(current === 'interested' || current === 'waitlisted') && (
                   <button className="btn btn-link danger" disabled={busy} onClick={() => void change('withdrawn')}>
-                    {current === 'interested' ? 'Remove my interest' : current === 'waitlisted' ? 'Leave the waitlist' : 'Withdraw'}
+                    {current === 'interested' ? 'Remove my interest' : 'Leave the waitlist'}
                   </button>
                 )}
                 {!eligible && (
@@ -512,8 +524,6 @@ function OwnersPanel({
 
   // Admins only: the database refuses this for anyone else.
   async function remove(owner: OpportunityOwner) {
-    const name = owner.user_id === me ? 'yourself' : displayName(people.get(owner.user_id))
-    if (!window.confirm(`Remove ${name} as an owner? They will no longer be able to edit this post or see its names.`)) return
     setError(null)
     setNotice(null)
     setBusy(true)
@@ -530,7 +540,6 @@ function OwnersPanel({
   }
 
   async function stepDown() {
-    if (!window.confirm('Step down as an owner? You will no longer be able to edit this post or see its names.')) return
     setError(null)
     setNotice(null)
     setBusy(true)
@@ -561,25 +570,27 @@ function OwnersPanel({
                   {o.user_id === me && <span className="muted small"> (you)</span>}
                 </span>
                 {isAdmin && (
-                  <button
-                    type="button"
+                  <ConfirmAction
+                    label="Remove"
+                    ariaLabel={`Remove ${displayName(person)} as an owner`}
                     className="btn btn-link danger small"
+                    question={`Remove ${o.user_id === me ? 'yourself' : displayName(person)} as an owner?`}
+                    detail="They will no longer be able to edit this post or see its names."
+                    confirmLabel="Yes, remove"
                     disabled={busy}
-                    onClick={() => void remove(o)}
-                    aria-label={`Remove ${displayName(person)} as an owner`}
-                  >
-                    Remove
-                  </button>
+                    onConfirm={() => remove(o)}
+                  />
                 )}
                 {o.user_id === me && canStepDown && (
-                  <button
-                    type="button"
+                  <ConfirmAction
+                    label="Step down"
                     className="btn btn-link danger small"
+                    question="Step down as an owner?"
+                    detail="You will no longer be able to edit this post or see its names."
+                    confirmLabel="Yes, step down"
                     disabled={busy}
-                    onClick={() => void stepDown()}
-                  >
-                    Step down
-                  </button>
+                    onConfirm={stepDown}
+                  />
                 )}
               </li>
             )

@@ -3,6 +3,7 @@ import { Pencil, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
 import EmailPeople, { type EmailGroup } from '../components/EmailPeople'
+import LoadError from '../components/LoadError'
 import { byId, fetchOpportunities, fetchOwners, fetchProfiles, fetchSignups, useLoader } from '../lib/data'
 import {
   displayName,
@@ -21,12 +22,12 @@ import type { Opportunity, OpportunityOwner, Profile, Signup } from '../lib/type
 // limits full sign-up lists to owners and admins.
 export default function MyPosts() {
   const profile = useProfile()
-  const { data, error, loading } = useLoader(
+  const { data, error, loading, reload } = useLoader(
     () => Promise.all([fetchOpportunities(), fetchOwners(), fetchSignups(), fetchProfiles()]),
     [],
   )
 
-  if (error) return <p className="error">Could not load your posts: {error}</p>
+  if (error) return <LoadError what="your posts" error={error} onRetry={reload} />
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 

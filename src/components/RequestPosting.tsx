@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Send } from 'lucide-react'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import { useLoader } from '../lib/data'
+import LoadError from './LoadError'
 import { formatDate } from '../lib/format'
 import { friendlyError, supabase } from '../lib/supabase'
 import type { PostRequest } from '../lib/types'
@@ -38,7 +39,7 @@ export default function RequestPosting() {
     await reload()
   }
 
-  if (loadError) return <p className="error">Could not load your request: {loadError}</p>
+  if (loadError) return <LoadError what="your request" error={loadError} onRetry={reload} />
   if (latest === undefined) return <p className="muted">Loading…</p>
 
   if (latest?.status === 'pending') {

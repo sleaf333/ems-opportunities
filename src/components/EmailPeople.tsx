@@ -14,6 +14,8 @@ export interface EmailGroup {
 // computer's default mail app. "Open Outlook on the web" starts a new message.
 export default function EmailPeople({ subject, groups }: { subject: string; groups: EmailGroup[] }) {
   const [copied, setCopied] = useState<string | null>(null)
+  // If the browser blocks the clipboard, show the addresses to copy by hand.
+  const [manual, setManual] = useState<string | null>(null)
   const filled = groups.filter((g) => g.people.length > 0)
   if (filled.length === 0) return null
 
@@ -27,7 +29,7 @@ export default function EmailPeople({ subject, groups }: { subject: string; grou
       setCopied(label)
       window.setTimeout(() => setCopied((c) => (c === label ? null : c)), 2500)
     } catch {
-      window.prompt('Copy these addresses, then paste them into Bcc:', text)
+      setManual(text)
     }
   }
 
@@ -59,6 +61,19 @@ export default function EmailPeople({ subject, groups }: { subject: string; grou
         </a>
         <span className="small muted">Copy a group, then paste into the Bcc line.</span>
       </div>
+      {manual && (
+        <div className="confirm-inline">
+          <p className="small">
+            <strong>Copy these addresses</strong> (press and hold, or select all), then paste them into the Bcc line.
+          </p>
+          <textarea readOnly rows={3} value={manual} onFocus={(e) => e.currentTarget.select()} aria-label="Email addresses" />
+          <div>
+            <button type="button" className="btn btn-link small" onClick={() => setManual(null)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
       <span className="visually-hidden" role="status">{copied ? `${copied} emails copied` : ''}</span>
     </div>
   )

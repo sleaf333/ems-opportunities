@@ -4,6 +4,7 @@ import { ArrowRight, MapPin, Search, Sprout } from 'lucide-react'
 import { useProfile } from '../auth/AuthContext'
 import { AvatarStack } from '../components/Avatars'
 import CountUp from '../components/CountUp'
+import LoadError from '../components/LoadError'
 import OppIcon from '../components/OppIcon'
 import {
   byId,
@@ -70,7 +71,7 @@ async function loadBoard() {
 
 export default function OpportunityList() {
   const profile = useProfile()
-  const { data, error, loading } = useLoader(loadBoard, [])
+  const { data, error, loading, reload } = useLoader(loadBoard, [])
   const [search, setSearch] = useState('')
   const [type, setType] = useState<OppType | ''>('')
   const [region, setRegion] = useState<OppRegion | ''>('')
@@ -235,7 +236,7 @@ export default function OpportunityList() {
         </div>
       </div>
 
-      {error && <p className="error">Could not load opportunities: {error}</p>}
+      {error && <LoadError what="opportunities" error={error} onRetry={reload} />}
       {loading && !data && <p className="muted">Loading…</p>}
       {data && visible.length === 0 && <p className="empty">Nothing matches those filters.</p>}
 

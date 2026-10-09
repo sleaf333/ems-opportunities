@@ -120,7 +120,34 @@ interface AsyncState<T> {
   reload: () => Promise<void>
 }
 
+// Phones drop requests now and then (switching apps or pages, weak signal,
+// waking up with an expired sign-in token). Try again a couple of times,
+// refreshing the sign-in between tries, before showing an error.
+export const RETRY_DELAYS_MS = [600, 1500]
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  delays: number[] = RETRY_DELAYS_MS,
+  beforeRetry: () => Promise<unknown> = refreshSession,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (attempt >= delays.length) throw err
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]))
+      await beforeRetry().catch(() => undefined)
+    }
+  }
+}
+
+// Getting the session refreshes an expired sign-in token if needed.
+function refreshSession(): Promise<unknown> {
+  return supabase.auth.getSession()
+}
+
 // Runs a loader on mount (and when deps change) and exposes reload().
+// Loading is retried automatically (see withRetry).
 export function useLoader<T>(loader: () => Promise<T>, deps: unknown[]): AsyncState<T> {
   const [data, setData] = useState<T | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
@@ -131,7 +158,7 @@ export function useLoader<T>(loader: () => Promise<T>, deps: unknown[]): AsyncSt
   const reload = useCallback(async () => {
     setLoading(true)
     try {
-      setData(await run())
+      setData(await withRetry(run))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

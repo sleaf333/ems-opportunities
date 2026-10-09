@@ -2060,3 +2060,37 @@ tr.expanded td {
 [id] {
   scroll-margin-top: 5.5rem;
 }
+
+/* "Are you sure?" shown on the page (never a browser pop-up). */
+.confirm-inline {
+  flex-basis: 100%;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
+}
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.owners-panel .people li {
+  flex-wrap: wrap;
+}
+.stack-sm > .confirm-inline .btn {
+  width: auto;
+}
+.rename-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.rename-form input {
+  padding: 0.25rem 0.5rem;
+  min-width: 9rem;
+}

@@ -7,8 +7,12 @@ export const isConfigured = Boolean(url && anonKey)
 
 // "implicit" flow lets a login link opened on a different device (for example,
 // requested on a work PC, opened on a phone) still work.
+// The library's own retries are off: pages retry whole loads instead (withRetry
+// in data.ts), which also covers sign-up counts and refreshes the sign-in
+// between tries, and gives up within a few seconds so "Try again" appears.
 export const supabase = createClient(url ?? 'http://localhost', anonKey ?? 'missing', {
   auth: { flowType: 'implicit', persistSession: true, detectSessionInUrl: true },
+  db: { retry: false },
 })
 
 export const EMAIL_DOMAIN = 'ems-wi.com'
