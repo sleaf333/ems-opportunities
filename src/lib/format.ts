@@ -49,11 +49,14 @@ export const STATUS_LABELS: Record<OppStatus, string> = {
 
 export const SIGNUP_LABELS: Record<SignupStatus, string> = {
   interested: 'Interested',
-  committed: 'Committed',
+  // Stored as committed; a lead confirmed them (members cannot commit
+  // themselves since 0012).
+  committed: 'Confirmed',
   waitlisted: 'Waitlisted',
   withdrawn: 'Withdrawn',
   completed: 'Completed',
   no_show: 'Did not attend',
+  not_selected: 'Reviewed by the lead',
 }
 
 export const POSITION_LABELS: Record<MemberPosition, string> = {
@@ -112,7 +115,7 @@ export function deadlinePassed(opp: Opportunity): boolean {
   return Boolean(opp.signup_deadline && opp.signup_deadline < localToday())
 }
 
-// Only the positions a post lists may sign up (interest or commit);
+// Only the positions a post lists may raise their hand;
 // everyone can still view it.
 export function canSignUp(opp: Opportunity, profile: Profile): boolean {
   return profile.position !== null && opp.eligible_positions.includes(profile.position)

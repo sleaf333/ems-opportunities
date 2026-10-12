@@ -782,7 +782,7 @@ function Members({
     downloadCsv(
       `members-${stamp}.csv`,
       toCsv(
-        ['Name', 'Email', 'Position', 'Site role', 'Interested now', 'Committed now', 'Completed', 'Withdrawn', 'Ever committed', 'Last activity', 'Interest topics', 'Other interests', 'Leadership goals', 'Joined'],
+        ['Name', 'Email', 'Position', 'Site role', 'Interested now', 'Confirmed now', 'Completed', 'Withdrawn', 'Ever confirmed', 'Last activity', 'Interest topics', 'Other interests', 'Leadership goals', 'Joined'],
         data.profiles.map((p) => {
           const e = engagement.get(p.id) ?? BLANK_ENGAGEMENT
           const i = interestsByUser.get(p.id)
@@ -801,14 +801,14 @@ function Members({
     downloadCsv(
       `opportunities-${stamp}.csv`,
       toCsv(
-        ['Title', 'Type', 'Status', 'Location', 'Hospital or site', 'Format', 'Who can sign up', 'Commitment', 'Time needed', 'Spots', 'Committed', 'Interested', 'Waitlisted', 'Start', 'End', 'Deadline', 'Show on site until', 'Expired', 'Names shown to members', 'Good for new hires', 'Topics', 'Contacts', 'Posted by', 'Posted'],
+        ['Title', 'Type', 'Status', 'Location', 'Hospital or site', 'Format', 'Who can sign up', 'Commitment', 'Time needed', 'Seats', 'Confirmed', 'Interested', 'Not this time', 'Start', 'End', 'Deadline', 'Show on site until', 'Expired', 'Names shown to members', 'Good for new hires', 'Topics', 'Contacts', 'Posted by', 'Posted'],
         data.opportunities.map((o) => {
           const mine = data.signups.filter((s) => s.opportunity_id === o.id)
           const n = (st: Signup['status'][]) => mine.filter((s) => st.includes(s.status)).length
           return [
             o.title, TYPE_LABELS[o.type], STATUS_LABELS[o.status], REGION_LABELS[o.region], o.site,
             FORMAT_LABELS[o.format], eligibilityLabel(o.eligible_positions), COMMITMENT_LABELS[o.commitment], o.time_estimate,
-            o.capacity ?? 'No limit', n(['committed', 'completed']), n(['interested']), n(['waitlisted']),
+            o.capacity ?? 'No limit', n(['committed', 'completed']), n(['interested', 'waitlisted']), n(['not_selected']),
             o.start_date ?? '', o.end_date ?? '', o.signup_deadline ?? '', o.visible_until ?? 'Indefinitely',
             isExpired(o) ? 'Yes' : 'No', o.show_names ? 'Yes' : 'No', o.new_hire_friendly ? 'Yes' : 'No',
             (data.topics.get(o.id) ?? []).map((t) => t.name).join('; '),
@@ -890,7 +890,7 @@ function Members({
         </select>
         <label className="check">
           <input type="checkbox" checked={onlyUntapped} onChange={(e) => setOnlyUntapped(e.target.checked)} />
-          Interested but never committed
+          Interested but never confirmed
         </label>
       </div>
       <div className="table-wrap">
@@ -902,7 +902,7 @@ function Members({
               <th>Site role</th>
               <th>Interests</th>
               <th className="num" title="Current interests">Interested</th>
-              <th className="num" title="Committed or waitlisted now">Committed</th>
+              <th className="num" title="Confirmed by a lead now">Confirmed</th>
               <th className="num">Completed</th>
               <th className="num">Withdrawn</th>
               <th>Last activity</th>

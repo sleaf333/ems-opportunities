@@ -355,7 +355,7 @@ export default function OpportunityForm() {
         <div>
           <h2>Who can sign up</h2>
           <p className="small muted">
-            Everyone can see this post. Only the positions checked can mark Interested or Commit.
+            Everyone can see this post. Only the positions checked can raise their hand (mark Interested).
           </p>
         </div>
         <div className="chips" role="group" aria-label="Quick choices">

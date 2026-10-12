@@ -1,11 +1,11 @@
 # EMS Opportunities Portal: Project Plan
 
-A private website where our group can post committee, leadership and event opportunities. Members sign up, and the site keeps track of who is engaged and interested in what.
+A private website where our group can post committee, leadership and event opportunities. Members raise a hand, each post's lead confirms who joins, and the site keeps track of who is engaged and interested in what.
 
 ## Goals
 
 1. **Get the word out in real time.** One live link that always shows open opportunities. People are pointed to it through the group newsletter and regular reminders, with an optional automatic email digest later.
-2. **Track engagement and interest.** Record who expresses interest in, commits to and completes what, so leadership can spot future leaders and see how engaged the group is overall.
+2. **Track engagement and interest.** Record who expresses interest in, is confirmed for and completes what, so leadership can spot future leaders and see how engaged the group is overall.
 3. **Encourage participation.** Show who has signed up for each opportunity so people can see their colleagues taking part.
 4. **Give new hires an easy way in.** Posters can label opportunities as good for new hires. There is no new-hire tracking and no limit on commitments; the in-person committee handles that.
 5. **Cost nothing to run.** Free plans only. The only optional cost is a custom web address (about $10 to $15 a year).
@@ -16,8 +16,8 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 
 | Role | Who | Can do |
 |---|---|---|
-| Member | Anyone with an @ems-wi.com email | Browse, express interest, commit, withdraw, edit own profile |
-| Shareholder | A position members choose (admins can correct it) | Can commit to shareholders-only committees |
+| Member | Anyone with an @ems-wi.com email | Browse, raise a hand (Interested), take it down or step off, edit own profile. Joining is confirmed by the post's lead |
+| Shareholder | A position members choose (admins can correct it) | Can raise a hand for shareholders-only committees |
 | Poster | Members an admin has approved | Everything a member can, plus create and manage their own opportunities and mark attendance. Posts go live immediately; admins do not review them first. |
 | Admin | Project owner and anyone they appoint | Everything, plus manage roles, edit or close any post, see all engagement data, export data |
 
@@ -48,10 +48,10 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 - [x] Browse and filter: by type, tag, time commitment, "good for new hires", open/closed, text search
 - [x] Two sign-up levels: **Interested** (no commitment) and **Committed** (takes a spot)
 - [x] Number of spots and a waitlist: when an opportunity is full, new commitments go on the waitlist, and the first waitlisted person moves up when someone withdraws or a spot is added
-- [x] Public list of names on each opportunity: Committed, Waitlist and Interested
+- [x] Public list of names on each opportunity: Confirmed and Interested (when the owners choose to show names)
 - [x] "My sign-ups" page for each member
 - [x] Full history log of every sign-up change (who, what, when)
-- [x] Admin engagement table with an "Interested but never committed" filter
+- [x] Admin engagement table with an "Interested but never confirmed" filter
 - [x] CSV exports of members, opportunities, sign-ups and history (admin), plus a one-file full backup of every table
 - [x] Every opportunity has its own link to paste into the newsletter; people who are not signed in land there after signing in
 
@@ -67,7 +67,12 @@ About 150 physicians, plus APCs and admin staff who share the same email domain.
 - [x] Several owners per post (co-chairs): whoever posts it is the first owner; owners and admins add co-owners by email on the post page (the person must have signed in once); owners can step down; only admins remove others. Owners edit the post and see every name
 - [x] "My posts" page for posters and admins: every post they own, with counts, names, and email buttons (everyone, per group, or copy the addresses)
 
-### Phase 2: Engagement dashboard
+### Phase 2: Engagement dashboard and committee leads
+- [ ] Every committee has its lead added as an owner (posts with no owner can only be decided by site admins)
+- [ ] Each lead reviews their post: description, time and hours, contacts (replace the "EMS Admin" placeholder), seat count and who can sign up (for example, limit the PPC to the right positions)
+- [ ] Optional: a People Analyzer (Traction / EOS) for each role, so leads judge fit the same way ("right people, right seats")
+- [ ] Leads add their current members by email on My posts, so rosters on the site are accurate
+- [ ] Communicate the above to committee leads (Sam, the c-suite or Jawwad), with a short "how to confirm people" note
 - [ ] Posters mark attendance or completion (in bulk: "everyone attended" with exceptions)
 - [x] Admin Insights ("Leadership pipeline"): engagement funnel, activity by month, rising stars, interest heatmap by location and by position, and gaps (topics wanted with no post, quiet posts, locations with nothing open), filterable by time range and position
 
@@ -91,7 +96,7 @@ This is what will be recorded:
 **Dashboard metrics**
 - Per person: number of interests, commitments, completions and withdrawals; types of opportunities; first and most recent activity
 - Per opportunity: how full it is, time to fill, completion rate
-- Group-wide: percent of members active in the last 6 and 12 months, trends by type and position, and a list of **people showing interest who haven't committed yet** (possible future leaders to approach)
+- Group-wide: percent of members active in the last 6 and 12 months, trends by type and position, and a list of **people showing interest who haven't been confirmed yet** (possible future leaders to approach)
 
 **Not tracked:** page views and clicks tied to a specific person.
 
@@ -111,7 +116,7 @@ The real definitions are in `supabase/migrations/`. In short:
 - **member_interests**: interests and leadership goals (private to the member and admins)
 - **member_presets**: roles an admin set for people who have not signed in yet
 - **opportunities**: title, type, description, who can commit, time commitment, time needed, dates, deadline, spots, new-hire label, topics, contact, status
-- **signups**: one row per person per opportunity, with a status: interested, committed, waitlisted, withdrawn, completed or did not attend
+- **signups**: one row per person per opportunity, with a status: interested, committed (shown as Confirmed; set by the post's lead), not_selected ("Not this time", shown to the member as "Reviewed by the lead"), withdrawn, completed or did not attend. waitlisted is no longer used (0012)
 - **signup_events**: history of every status change (who, from, to, when, changed by)
 
 ## Technology ($0 per month)
@@ -142,6 +147,7 @@ The real definitions are in `supabase/migrations/`. In short:
 ## Open questions
 
 1. Leadership's written decision on whether engagement data may be used in evaluations or partnership decisions (then add it to the "What we track" page).
+   - Related (c-suite, 2026-10-12): could the site feed the year-end tracking of shareholder involvement for the incentive bonus? To discuss in person; nothing planned yet. The site already keeps a dated record of who raised a hand, who a lead confirmed and who stepped off, and could later record attendance. Before any use for pay: decide what counts (confirmed seats, attendance, leadership roles, hours), who verifies it, and update the "What we track" page so members know.
 2. Which of the 15 committees should carry the "good for new hires" label? (None are labeled yet.)
 3. Physician and APC Interview Committees: the brochure lists them under "All Team Members". Keep as one entry open to all, or split into separate physician and APC entries?
 
@@ -189,4 +195,5 @@ The real definitions are in `supabase/migrations/`. In short:
 | 2026-10-03 | "Admin" role relabelled "Site admin" and "role" shown as "site role", to keep it apart from the Administrative staff position. Granting Site admin asks for confirmation, and the Admin page lists current site admins. Site admins are kept to about three people |
 | 2026-10-09 | Pilot fixes: confirmations happen on the page, never as browser pop-ups (blocked in the Outlook app on iPhone, which broke Withdraw); page loads retry automatically and show "Try again" instead of a dead end |
 | 2026-10-09 | Reminder emails, changing the earlier "no automatic emails" stance for these two cases only. Owners tick "Contacted" per person on My posts (the site cannot otherwise know); owners get a summary about every two weeks listing people not yet ticked, spread across the 14 days so sends do not pile onto one day, and only when someone is waiting (no daily digest). Members get one follow-up after three weeks if not ticked. Anyone can turn these off on Profile. Sent from the database (pg_cron + pg_net) through Brevo's API, at most 150 a day so sign-in codes keep room in the free 300; the Brevo key lives in the Supabase Vault. Off until an admin turns it on |
+| 2026-10-12 | Leads confirm who joins ("right people, right seats", c-suite feedback after a pilot sign-up for the PPC that was not a fit). Members can no longer commit themselves to anything: they raise a hand (Interested). The post's owners, or a site admin, choose Confirm or Not this time for each person, can undo either, and can add current members by email (they must have signed in once). Seat limits apply when confirming; the waitlist is retired. "Not this time" shows the member the neutral "Reviewed by the lead" (the lead tells them personally) and they may raise a hand again. "Committed" is shown everywhere as "Confirmed". Reminder emails cover only people still waiting. Supersedes the 2026-09-28 rules on committing and the first-come waitlist |
 | 2026-09-30 | The member directory (names, emails, positions, roles) stays readable to signed-in members, like the Outlook address book; interests, goals and history stay private to the member and admins |

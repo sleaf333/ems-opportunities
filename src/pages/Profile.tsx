@@ -141,7 +141,7 @@ export default function Profile() {
             as contacted yet. Only sent when someone is waiting.
           </li>
           <li>
-            If you mark Interested or Commit and no one reaches out within three weeks: one follow-up with who to
+            If you raise your hand and no one reaches out within three weeks: one follow-up with who to
             contact.
           </li>
         </ul>

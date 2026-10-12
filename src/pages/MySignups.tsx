@@ -32,7 +32,7 @@ export default function MySignups() {
     <div className="stack-lg narrow">
       <h1>My sign-ups</h1>
       <SignupTable title="Current" rows={active} oppMap={oppMap} empty={<>Nothing yet. <Link to="/">Browse opportunities</Link>.</>} />
-      {past.length > 0 && <SignupTable title="Past and withdrawn" rows={past} oppMap={oppMap} />}
+      {past.length > 0 && <SignupTable title="Past, withdrawn and reviewed" rows={past} oppMap={oppMap} />}
     </div>
   )
 }

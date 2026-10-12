@@ -133,7 +133,7 @@ export default function Insights() {
               <h2>Rising stars</h2>
               <p className="small muted">
                 People whose involvement grew in the last {RISING_WINDOW_DAYS} days compared with the{' '}
-                {RISING_WINDOW_DAYS} days before. Committing counts more than interest, and leadership roles count
+                {RISING_WINDOW_DAYS} days before. Being confirmed counts more than interest, and leadership roles count
                 extra.
               </p>
             </div>
@@ -146,7 +146,7 @@ export default function Insights() {
                 <h2>Where interest is</h2>
                 <p className="small muted">
                   {heatView === 'location'
-                    ? `People who showed interest or committed, by topic and location, in ${rangeWord}.`
+                    ? `People who showed interest or were confirmed, by topic and location, in ${rangeWord}.`
                     : 'Members who picked each topic on their profile, by position.'}
                 </p>
               </div>
