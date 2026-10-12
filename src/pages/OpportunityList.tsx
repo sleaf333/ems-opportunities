@@ -142,8 +142,8 @@ export default function OpportunityList() {
           <h1>Find where you fit</h1>
           <span className="rule rule-bleed" aria-hidden="true" />
           <p className="hero-lede">
-            Committees, leadership roles and events across the group. Raise your hand with no strings attached, or
-            commit to take a spot.
+            Committees, leadership roles and events across the group. Raise your hand with no strings attached; the
+            lead reviews everyone and reaches out.
           </p>
         </div>
         <label className="hero-search">
@@ -275,7 +275,8 @@ const MY_LABELS: Partial<Record<Signup['status'], string>> = {
   committed: "You're in",
   completed: 'Completed',
   interested: 'Interested',
-  waitlisted: 'Waitlisted',
+  waitlisted: 'Interested',
+  not_selected: 'Reviewed',
 }
 
 function OpportunityCard({
@@ -307,9 +308,8 @@ function OpportunityCard({
   if (taken === 0 && counts.interested === 0 && counts.waitlisted === 0) footText = 'Be the first to raise your hand'
   else {
     const parts = []
-    if (taken) parts.push(`${taken} in`)
-    if (counts.interested) parts.push(`${counts.interested} interested`)
-    if (counts.waitlisted) parts.push(`${counts.waitlisted} waiting`)
+    if (taken) parts.push(`${taken} confirmed`)
+    if (counts.interested + counts.waitlisted) parts.push(`${counts.interested + counts.waitlisted} interested`)
     footText = parts.join(' · ')
   }
 
@@ -358,7 +358,7 @@ function OpportunityCard({
             <span style={{ width: `${Math.min(100, (taken / opp.capacity) * 100)}%` }} />
           </div>
           <span className="spots-text">
-            {taken >= opp.capacity ? 'Full' : `${opp.capacity - taken} of ${opp.capacity} spots left`}
+            {taken >= opp.capacity ? 'Full' : `${opp.capacity - taken} of ${opp.capacity} seats open`}
           </span>
         </div>
       )}

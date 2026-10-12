@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   ArrowLeft,
   CalendarClock,
@@ -25,6 +25,7 @@ import ConfirmAction from '../components/ConfirmAction'
 import CountUp from '../components/CountUp'
 import Description from '../components/Description'
 import EmailPeople from '../components/EmailPeople'
+import LeadPeople from '../components/LeadPeople'
 import LoadError from '../components/LoadError'
 import {
   byId,
@@ -92,11 +93,20 @@ export default function OpportunityDetail() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [ownerNotice, setOwnerNotice] = useState<string | null>(null)
-  // Moments of delight: a burst on Commit, a ripple on Interested.
+  // Moments of delight: a ripple on Interested, and a burst the first time
+  // someone sees that a lead confirmed them.
   const [celebrateKey, setCelebrateKey] = useState(0)
   const [justJoined, setJustJoined] = useState(false)
   const [rippleKey, setRippleKey] = useState(0)
   const statusRef = useRef<HTMLElement>(null)
+  const confirmedSignup = data?.[1].find((s) => s.user_id === profile.id && s.status === 'committed')?.id
+
+  useEffect(() => {
+    if (!confirmedSignup || alreadyCelebrated(confirmedSignup)) return
+    rememberCelebrated(confirmedSignup)
+    setJustJoined(true)
+    setCelebrateKey((k) => k + 1)
+  }, [confirmedSignup])
 
   if (error) return <LoadError what="this opportunity" error={error} onRetry={reload} />
   if (loading && !data) return <p className="muted">Loading…</p>
@@ -130,7 +140,6 @@ export default function OpportunityDetail() {
   const namesVisible = isAdmin || isOwner || opp.show_names
   const manages = isAdmin || isOwner
   const committedCount = counts?.committed ?? 0
-  const full = opp.capacity !== null && committedCount >= opp.capacity
 
   async function change(status: SignupStatus) {
     setBusy(true)
@@ -145,12 +154,10 @@ export default function OpportunityDetail() {
       setActionError(friendlyError(rpcError))
       return
     }
-    if (result === 'waitlisted') {
-      setNotice('All spots are taken, so you are on the waitlist. You will move up automatically if a spot opens.')
+    if (result === 'interested') {
+      setRippleKey((k) => k + 1)
+      setNotice('Thanks for raising your hand. The lead reviews everyone and will be in touch.')
     }
-    setJustJoined(result === 'committed')
-    if (result === 'committed') setCelebrateKey((k) => k + 1)
-    if (result === 'interested') setRippleKey((k) => k + 1)
     await reload()
   }
 
@@ -178,8 +185,8 @@ export default function OpportunityDetail() {
   })
   facts.push({
     icon: Ticket,
-    label: 'Spots',
-    value: opp.capacity ? `${committedCount} of ${opp.capacity} taken` : 'No limit',
+    label: 'Seats',
+    value: opp.capacity ? `${committedCount} of ${opp.capacity} filled` : 'No limit',
   })
   const contacts = contactsOf(opp)
   if (contacts.length > 0) {
@@ -292,39 +299,40 @@ export default function OpportunityDetail() {
               <p className="small muted">Attendance has been recorded.</p>
             ) : (
               <div className="stack-sm">
-                {isOpen && current !== 'committed' && current !== 'waitlisted' && (
-                  <button
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void change('committed')}
-                  >
-                    {full ? 'Join the waitlist' : 'Commit'}
-                  </button>
+                {current === 'interested' && (
+                  <p className="small muted">The lead reviews everyone who raises a hand and will be in touch.</p>
                 )}
-                {isOpen && current !== 'interested' && current !== 'committed' && current !== 'waitlisted' && (
-                  <button className="btn btn-secondary" disabled={busy} onClick={() => void change('interested')}>
-                    I'm interested
-                  </button>
+                {current === 'committed' && <p className="small muted">The lead confirmed you. Welcome aboard.</p>}
+                {current === 'not_selected' && (
+                  <p className="small muted">
+                    The lead has reviewed your interest. If you would like to talk about it, reach out to the contacts
+                    listed for this post.
+                  </p>
                 )}
-                {isOpen && (current === 'committed' || current === 'waitlisted') && (
-                  <button className="btn btn-secondary" disabled={busy} onClick={() => void change('interested')}>
-                    Change to just interested
-                  </button>
+                {isOpen && (!current || current === 'withdrawn' || current === 'not_selected') && (
+                  <>
+                    <button className="btn btn-primary" disabled={busy} onClick={() => void change('interested')}>
+                      {current === 'not_selected' ? 'Raise my hand again' : "I'm interested"}
+                    </button>
+                    {current !== 'not_selected' && (
+                      <p className="small muted">The lead reviews everyone who raises a hand and reaches out.</p>
+                    )}
+                  </>
                 )}
                 {current === 'committed' && (
                   <ConfirmAction
-                    label="Withdraw"
-                    question="Give up your spot?"
-                    detail={opp.capacity ? 'If anyone is on the waitlist, the next person gets it.' : undefined}
-                    confirmLabel="Yes, give up my spot"
-                    cancelLabel="Keep it"
+                    label="Step off"
+                    question="Step off this?"
+                    detail="Please let the lead know too."
+                    confirmLabel="Yes, step off"
+                    cancelLabel="Stay on"
                     disabled={busy}
                     onConfirm={() => change('withdrawn')}
                   />
                 )}
                 {(current === 'interested' || current === 'waitlisted') && (
                   <button className="btn btn-link danger" disabled={busy} onClick={() => void change('withdrawn')}>
-                    {current === 'interested' ? 'Remove my interest' : 'Leave the waitlist'}
+                    Remove my interest
                   </button>
                 )}
                 {!eligible && (
@@ -349,46 +357,37 @@ export default function OpportunityDetail() {
 
           <section className="panel stack">
             <h2 className="panel-title">Who's in</h2>
-            {namesVisible ? (
+            {manages ? (
               <>
-                <PeopleList title="Committed" rows={group(['committed', 'completed'])} people={people} linked={manages} />
-                <PeopleList title="Waitlist" rows={group(['waitlisted'])} people={people} linked={manages} ordered />
-                <PeopleList title="Interested" rows={group(['interested'])} people={people} linked={manages} />
-                {manages && (
-                  <PeopleList title="Withdrawn" rows={group(['withdrawn', 'no_show'])} people={people} linked />
-                )}
-                {manages && (
-                  <EmailPeople
-                    subject={opp.title}
-                    groups={[
-                      { label: 'Committed', people: profilesOf(group(['committed', 'completed']), people) },
-                      { label: 'Waitlist', people: profilesOf(group(['waitlisted']), people) },
-                      { label: 'Interested', people: profilesOf(group(['interested']), people) },
-                    ]}
-                  />
-                )}
-                {manages && (
-                  <p className="small muted">
-                    {opp.show_names
-                      ? 'Everyone signed in can see these names.'
-                      : "Only this post's owners and admins can see these names."}
-                  </p>
-                )}
+                <LeadPeople opp={opp} signups={signups} people={people} onChanged={reload} />
+                <PeopleList title="Withdrawn" rows={group(['withdrawn', 'no_show'])} people={people} linked />
+                <EmailPeople
+                  subject={opp.title}
+                  groups={[
+                    { label: 'Confirmed', people: profilesOf(group(['committed', 'completed']), people) },
+                    { label: 'Waiting', people: profilesOf(group(['interested', 'waitlisted']), people) },
+                  ]}
+                />
+                <p className="small muted">
+                  {opp.show_names
+                    ? 'Everyone signed in can see who is confirmed and interested.'
+                    : "Only this post's owners and admins can see these names."}
+                </p>
+              </>
+            ) : namesVisible ? (
+              <>
+                <PeopleList title="Confirmed" rows={group(['committed', 'completed'])} people={people} />
+                <PeopleList title="Interested" rows={group(['interested', 'waitlisted'])} people={people} />
               </>
             ) : (
               <>
                 <div className="count-row">
                   <span>
-                    <strong><CountUp value={counts?.committed ?? 0} /></strong> committed
+                    <strong><CountUp value={counts?.committed ?? 0} /></strong> confirmed
                   </span>
                   <span>
-                    <strong><CountUp value={counts?.interested ?? 0} /></strong> interested
+                    <strong><CountUp value={(counts?.interested ?? 0) + (counts?.waitlisted ?? 0)} /></strong> interested
                   </span>
-                  {(counts?.waitlisted ?? 0) > 0 && (
-                    <span>
-                      <strong><CountUp value={counts?.waitlisted ?? 0} /></strong> waitlisted
-                    </span>
-                  )}
                 </div>
                 <p className="small muted names-hidden">
                   <EyeOff size={14} aria-hidden="true" /> Names are visible to the post's owners and admins.
@@ -640,7 +639,7 @@ function PeopleList({
   ordered?: boolean
   linked?: boolean
 }) {
-  if (rows.length === 0 && title !== 'Committed' && title !== 'Interested') return null
+  if (rows.length === 0 && title !== 'Confirmed' && title !== 'Interested') return null
   return (
     <div className="people-group">
       <h3>
@@ -667,4 +666,26 @@ function PeopleList({
       )}
     </div>
   )
+}
+
+// The "You're in!" burst plays once per confirmation, remembered in this
+// browser only. Storage can be unavailable (private windows), so failures are
+// ignored and the burst may simply play again.
+const CELEBRATED_KEY = 'ems-celebrated-signups'
+
+function alreadyCelebrated(signupId: string): boolean {
+  try {
+    return (JSON.parse(localStorage.getItem(CELEBRATED_KEY) ?? '[]') as string[]).includes(signupId)
+  } catch {
+    return false
+  }
+}
+
+function rememberCelebrated(signupId: string) {
+  try {
+    const seen = JSON.parse(localStorage.getItem(CELEBRATED_KEY) ?? '[]') as string[]
+    localStorage.setItem(CELEBRATED_KEY, JSON.stringify([...seen.slice(-200), signupId]))
+  } catch {
+    // Not remembered; harmless.
+  }
 }

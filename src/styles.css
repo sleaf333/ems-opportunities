@@ -1843,6 +1843,53 @@ tr.expanded td {
   overflow-wrap: anywhere;
 }
 
+/* Lead controls: decide who joins (My posts and the post page) */
+.lead-people h4,
+.lead-people summary {
+  margin: 0 0 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.lead-people summary {
+  cursor: pointer;
+}
+.lead-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.lead-rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem 0.75rem;
+}
+.lead-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lead-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+.lead-actions .confirm-inline {
+  flex-basis: 100%;
+}
+.lead-add {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+}
+
 /* Admin: email reminders */
 .badge-on {
   background: var(--success-soft);

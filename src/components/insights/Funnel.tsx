@@ -49,7 +49,7 @@ export default function Funnel({ result }: { result: FunnelResult }) {
       {node}
       {result.untapped > 0 && (
         <Link className="funnel-untapped" to="/admin?untapped=1#members">
-          {result.untapped} raised a hand but never committed →
+          {result.untapped} raised a hand but never confirmed →
         </Link>
       )}
     </div>

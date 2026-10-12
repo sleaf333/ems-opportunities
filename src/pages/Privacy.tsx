@@ -18,7 +18,7 @@ export default function Privacy() {
             Your name, work email and position (employed physician, shareholder track, shareholder, APC or
             administrative staff).
           </li>
-          <li>Each time you mark yourself interested, commit, join a waitlist or withdraw, and when.</li>
+          <li>Each time you raise your hand or take it down, each time a post's lead confirms you or chooses "Not this time", and when.</li>
           <li>Attendance or completion, if the organizer records it.</li>
           <li>The interest topics you pick, anything else you write in, and leadership goals, if you add them.</li>
           <li>Changes to posts and to roles (poster, admin), and requests to post, with who made them, so mistakes can be undone.</li>
@@ -42,7 +42,7 @@ export default function Privacy() {
             marked as contacted yet (only when someone is waiting).
           </li>
           <li>
-            If you mark Interested or Commit and no one has marked you as contacted after three weeks: one follow-up
+            If you raise your hand and no one has marked you as contacted after three weeks: one follow-up
             with who to reach out to.
           </li>
           <li>You can turn the reminder emails off on your Profile at any time.</li>

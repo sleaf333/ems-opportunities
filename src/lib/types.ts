@@ -12,6 +12,9 @@ export type SignupStatus =
   | 'withdrawn'
   | 'completed'
   | 'no_show'
+  // The post's lead chose "Not this time" (0012); shown to the member as
+  // "Reviewed by the lead".
+  | 'not_selected'
 
 export interface Profile {
   id: string

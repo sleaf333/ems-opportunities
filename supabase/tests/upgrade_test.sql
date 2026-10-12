@@ -29,7 +29,7 @@ select tests.eq((select other_interests from public.member_interests where user_
 select tests.eq((select leadership_goals from public.member_interests where user_id = 'b0000000-0000-0000-0000-000000000002'), 'Lead wellness', 'goals kept');
 
 select tests.eq((select count(*)::text from public.signups where status = 'committed'), '1', 'sign-ups kept');
-select tests.eq((select count(*)::text from public.signup_events), '1', 'history kept');
+select tests.eq((select count(*)::text from public.signup_events), '3', 'history kept (two sign-ups, plus 0012 moving the waitlisted one)');
 
 select tests.eq(
   (select string_agg(p.title, ',') from public.opportunity_owners o join public.opportunities p on p.id = o.opportunity_id
@@ -60,5 +60,10 @@ select tests.eq((select coalesce(position::text, '-') from public.member_presets
 select tests.eq((select bool_and(email_opt_in)::text from public.profiles), 'true', 'existing members opted in to emails');
 select tests.eq((select count(*)::text from public.signups where contacted_at is not null or nudged_at is not null), '0', 'existing sign-ups not marked contacted');
 select tests.eq((select enabled::text from public.notification_settings), 'false', 'emails start turned off');
+
+-- 0012: waitlists retired; nobody left waitlisted, and the new status exists.
+select tests.eq((select count(*)::text from public.signups where status::text = 'waitlisted'), '0', 'waitlisted people moved back to Interested');
+select tests.eq((select s.status::text from public.signups s join public.opportunities o on o.id = s.opportunity_id where o.title = 'Trauma'), 'interested', 'the waitlisted person is now Interested');
+select tests.eq((select count(*)::text from pg_enum where enumlabel = 'not_selected'), '1', 'Not this time status added');
 
 \o

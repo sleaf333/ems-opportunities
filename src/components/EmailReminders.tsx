@@ -72,9 +72,10 @@ export default function EmailReminders() {
     setMessage(null)
     setActionError(null)
     const { error: rpcError } = await action()
+    // Refresh first, so the message and the On/Off badge change together.
+    await reload()
     if (rpcError) setActionError(friendlyError(rpcError))
     else setMessage(done)
-    await reload()
     setBusy(false)
   }
 
@@ -122,9 +123,10 @@ export default function EmailReminders() {
             <span className={`badge ${data.enabled ? 'badge-on' : 'badge-off'}`}>{data.enabled ? 'On' : 'Off'}</span>
           </h2>
           <p className="small muted">
-            Owners get a summary about every {data.digest_every_days} days listing people not yet ticked Contacted
-            (spread across the days, only when someone is waiting). Members get one follow-up{' '}
-            {data.nudge_after_days} days after signing up if nobody ticked them Contacted. At most {data.daily_cap}{' '}
+            Owners get a summary about every {data.digest_every_days} days listing people still waiting for a decision
+            and not ticked Contacted (spread across the days, only when someone is waiting). Members get one follow-up{' '}
+            {data.nudge_after_days} days after raising a hand if the lead has not decided or ticked them Contacted. At most{' '}
+            {data.daily_cap}{' '}
             a day, so sign-in codes always fit within Brevo's free 300. Anyone can turn these off on their Profile.
           </p>
         </div>

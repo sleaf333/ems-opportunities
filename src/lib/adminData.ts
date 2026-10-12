@@ -89,7 +89,9 @@ export function engagementByPerson(data: Pick<AdminData, 'signups' | 'events'>):
   }
   for (const s of data.signups) {
     const e = get(s.user_id)
-    if (s.status === 'interested') e.interested++
+    // "Not this time" still counts as interest: someone who wants in, who an
+    // admin may want to point to a better fit.
+    if (s.status === 'interested' || s.status === 'not_selected') e.interested++
     else if (s.status === 'committed' || s.status === 'waitlisted') e.committed++
     else if (s.status === 'completed') e.completed++
     else e.withdrawn++

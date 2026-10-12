@@ -195,7 +195,7 @@ select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')
 reset role;
 
 -- ---------------------------------------------------------------------------
--- Sign-ups, spots and the waitlist
+-- Sign-ups: members raise a hand, the post's lead confirms (0012)
 -- ---------------------------------------------------------------------------
 
 set request.jwt.claim.sub = :'newbie';
@@ -206,24 +206,53 @@ reset role;
 set request.jwt.claim.sub = :'doc';
 set role authenticated;
 select tests.expect_error(format($$insert into public.signups (opportunity_id, user_id, status) values (%L, auth.uid(), 'completed')$$, :'fair_id'), 'permission denied%');
-select tests.eq(public.set_my_signup(:'fair_id', 'committed')::text, 'committed', 'first commit takes the spot');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'committed')$$, :'fair_id'), 'Only the post''s lead can confirm people%');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'waitlisted')$$, :'fair_id'), 'That choice is not allowed%');
+select tests.eq(public.set_my_signup(:'fair_id', 'interested')::text, 'interested', 'member raises a hand');
 reset role;
 
 set request.jwt.claim.sub = :'apc';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'fair_id', 'committed')::text, 'waitlisted', 'second commit is waitlisted');
+select tests.eq(public.set_my_signup(:'fair_id', 'interested')::text, 'interested', 'second member raises a hand');
 reset role;
 
 set request.jwt.claim.sub = :'partner';
 set role authenticated;
 select tests.eq(public.set_my_signup(:'fair_id', 'interested')::text, 'interested', 'partner shows interest');
+select id as partner_fair_signup from public.signups where user_id = auth.uid() and opportunity_id = :'fair_id' \gset
+-- Members cannot decide for themselves or anyone else.
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'confirm')$$, :'partner_fair_signup'), 'Only the post''s owners or an admin%');
+select tests.expect_error(format($$select public.owner_add_member(%L, 'partner@ems-wi.com')$$, :'fair_id'), 'Only the post''s owners or an admin%');
+reset role;
+set role anon;
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'confirm')$$, :'partner_fair_signup'), 'permission denied%');
 reset role;
 
+-- The post's lead (poster owns the career fair, capacity 1) decides.
+select id as doc_fair_signup from public.signups where user_id = :'doc' and opportunity_id = :'fair_id' \gset
+select id as apc_fair_signup from public.signups where user_id = :'apc' and opportunity_id = :'fair_id' \gset
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+select tests.eq(public.owner_decide_signup(:'doc_fair_signup', 'confirm')::text, 'committed', 'lead confirms the first person');
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'confirm')$$, :'apc_fair_signup'), 'All 1 seats are filled%');
+select tests.eq(public.owner_decide_signup(:'apc_fair_signup', 'not_selected')::text, 'not_selected', 'lead chooses Not this time');
+select tests.eq(public.owner_decide_signup(:'apc_fair_signup', 'undo')::text, 'interested', 'lead undoes it');
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'maybe')$$, :'apc_fair_signup'), 'That choice is not allowed%');
+reset role;
+select tests.eq((select changed_by::text from public.signup_events where signup_id = :'doc_fair_signup' order by id desc limit 1), :'poster', 'decision logged with the lead''s name');
+
+-- A confirmed member cannot quietly drop back to Interested; they step off.
 set request.jwt.claim.sub = :'doc';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'fair_id', 'withdrawn')::text, 'withdrawn', 'doc withdraws');
+select tests.eq(public.set_my_signup(:'fair_id', 'interested')::text, 'committed', 'confirmed stays confirmed');
+select tests.eq(public.set_my_signup(:'fair_id', 'withdrawn')::text, 'withdrawn', 'doc steps off');
 reset role;
-select tests.eq((select status::text from public.signups where user_id = :'apc' and opportunity_id = :'fair_id'), 'committed', 'waitlist promotes first in line');
+select tests.eq((select status::text from public.signups where user_id = :'apc' and opportunity_id = :'fair_id'), 'interested', 'nobody is moved up automatically');
+set request.jwt.claim.sub = :'poster';
+set role authenticated;
+select tests.eq(public.owner_decide_signup(:'apc_fair_signup', 'confirm')::text, 'committed', 'lead fills the freed seat');
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'confirm')$$, :'doc_fair_signup'), 'This person is no longer signed up%');
+reset role;
 
 -- ---------------------------------------------------------------------------
 -- Who can see names
@@ -289,7 +318,7 @@ reset role;
 update public.opportunities set status = 'closed', signup_deadline = null where id = :'fair_id';
 set request.jwt.claim.sub = :'doc';
 set role authenticated;
-select tests.expect_error(format($$select public.set_my_signup(%L, 'committed')$$, :'fair_id'), 'This opportunity is not open%');
+select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'fair_id'), 'This opportunity is not open%');
 reset role;
 
 -- ---------------------------------------------------------------------------
@@ -316,35 +345,34 @@ select tests.eq((select array_to_string(eligible_positions, ',') from public.opp
 set request.jwt.claim.sub = :'apc';
 set role authenticated;
 select tests.eq((select count(*)::text from public.opportunities where id = :'finance_id'), '1', 'ineligible can still view');
-select tests.expect_error(format($$select public.set_my_signup(%L, 'committed')$$, :'trauma_id'), 'This opportunity is not open to your position%');
 select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'trauma_id'), 'This opportunity is not open to your position%');
 reset role;
 
 set request.jwt.claim.sub = :'doc';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'employed physician joins physician committee');
+select tests.eq(public.set_my_signup(:'trauma_id', 'interested')::text, 'interested', 'employed physician joins physician committee');
 select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'finance_id'), 'This opportunity is not open to your position%');
 select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'track_id'), 'This opportunity is not open to your position%');
 reset role;
 
 set request.jwt.claim.sub = :'poster';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'shareholder track joins physician committee');
-select tests.eq(public.set_my_signup(:'track_id', 'committed')::text, 'committed', 'shareholder track joins track post');
+select tests.eq(public.set_my_signup(:'trauma_id', 'interested')::text, 'interested', 'shareholder track joins physician committee');
+select tests.eq(public.set_my_signup(:'track_id', 'interested')::text, 'interested', 'shareholder track joins track post');
 select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'finance_id'), 'This opportunity is not open to your position%');
 reset role;
 
 set request.jwt.claim.sub = :'partner';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'finance_id', 'committed')::text, 'committed', 'shareholder joins shareholder committee');
+select tests.eq(public.set_my_signup(:'finance_id', 'interested')::text, 'interested', 'shareholder joins shareholder committee');
 select tests.eq(public.set_my_signup(:'track_id', 'interested')::text, 'interested', 'shareholder joins track post');
-select tests.eq(public.set_my_signup(:'trauma_id', 'committed')::text, 'committed', 'shareholder counts as physician');
+select tests.eq(public.set_my_signup(:'trauma_id', 'interested')::text, 'interested', 'shareholder counts as physician');
 select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'office_id'), 'This opportunity is not open to your position%');
 reset role;
 
 set request.jwt.claim.sub = :'staffer';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'office_id', 'committed')::text, 'committed', 'administrative staff join admin-office post');
+select tests.eq(public.set_my_signup(:'office_id', 'interested')::text, 'interested', 'administrative staff join admin-office post');
 select tests.eq(public.set_my_signup(:'wellness_opp_id', 'interested')::text, 'interested', 'administrative staff join everyone committees');
 select tests.expect_error(format($$select public.set_my_signup(%L, 'interested')$$, :'trauma_id'), 'This opportunity is not open to your position%');
 reset role;
@@ -354,7 +382,7 @@ insert into public.opportunities (title, region, eligible_positions) values ('AP
 select id as apc_only_id from public.opportunities where title = 'APC skills lab' \gset
 set request.jwt.claim.sub = :'apc';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'apc_only_id', 'committed')::text, 'committed', 'APC joins APC-only post');
+select tests.eq(public.set_my_signup(:'apc_only_id', 'interested')::text, 'interested', 'APC joins APC-only post');
 reset role;
 set request.jwt.claim.sub = :'doc';
 set role authenticated;
@@ -630,22 +658,30 @@ select tests.eq((select count(*)::text from public.profiles where id = :'newbie'
 delete from public.opportunities where title = 'Co-chair event';
 select tests.eq((select count(*)::text from public.opportunities where title = 'Co-chair event'), '0', 'post with no activity can still be deleted');
 
--- Deliberate erase: everything goes, and the waitlist moves up.
+-- Deliberate erase: everything goes, and the seat is free for the lead to fill.
 insert into public.opportunities (title, region, capacity) values ('Erase test', 'milwaukee', 1);
 select id as erase_id from public.opportunities where title = 'Erase test' \gset
 set request.jwt.claim.sub = :'apc';
 set role authenticated;
-select public.set_my_signup(:'erase_id', 'committed');
+select public.set_my_signup(:'erase_id', 'interested');
 reset role;
 set request.jwt.claim.sub = :'staffer';
 set role authenticated;
-select tests.eq(public.set_my_signup(:'erase_id', 'committed')::text, 'waitlisted', 'second in line is waitlisted');
+select public.set_my_signup(:'erase_id', 'interested');
+reset role;
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.owner_decide_signup((select id from public.signups where user_id = :'apc' and opportunity_id = :'erase_id'), 'confirm');
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'confirm')$$, (select id from public.signups where user_id = :'staffer' and opportunity_id = :'erase_id')), 'All 1 seats are filled%');
 reset role;
 select tests.eq(left(public.erase_member_permanently(' APC@ems-wi.com '), 30), 'Erased apc@ems-wi.com and thei', 'erase member reports what it did');
 select tests.eq((select count(*)::text from public.profiles where id = :'apc'), '0', 'erased member is gone');
 select tests.eq((select count(*)::text from public.signups where user_id = :'apc'), '0', 'erased member''s sign-ups are gone');
 select tests.eq((select count(*)::text from public.signup_events where user_id = :'apc'), '0', 'erased member''s history is gone');
-select tests.eq((select status::text from public.signups where user_id = :'staffer' and opportunity_id = :'erase_id'), 'committed', 'waitlist moves up after erase');
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.eq(public.owner_decide_signup((select id from public.signups where user_id = :'staffer' and opportunity_id = :'erase_id'), 'confirm')::text, 'committed', 'seat frees up after erase');
+reset role;
 select tests.expect_error($$select public.erase_member_permanently('nobody@ems-wi.com')$$, 'No member with the email%');
 
 -- Erasing an owner: ownership and its log go too.
@@ -813,7 +849,7 @@ select public.set_my_signup(:'nocontact_id', 'interested');
 reset role;
 set request.jwt.claim.sub = :'mem2';
 set role authenticated;
-select public.set_my_signup(:'mail_id', 'committed');
+select public.set_my_signup(:'mail_id', 'interested');
 reset role;
 set request.jwt.claim.sub = :'mem3';
 set role authenticated;
@@ -891,7 +927,7 @@ update public.profiles set email_opt_in = false where id in (:'mem1', :'mem2');
 select public.run_daily_notifications(:'digest_at');
 select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '1', 'owner gets a digest on their day');
 select tests.eq((select details ->> 'people' from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '3', 'digest lists people not yet contacted (opted-out members too)');
-select tests.eq((select body ->> 'subject' from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com'), 'EMS Opportunities: 3 people to reach out to', 'digest subject');
+select tests.eq((select body ->> 'subject' from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com'), 'EMS Opportunities: 3 people waiting to hear from you', 'digest subject');
 select body ->> 'htmlContent' as digest_html from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' \gset
 select tests.eq((position('Mia &lt;One&gt;' in :'digest_html') > 0)::text, 'true', 'names are escaped');
 select tests.eq((position('Max Two' in :'digest_html') > 0)::text, 'false', 'contacted people are left out');
@@ -966,5 +1002,100 @@ set role authenticated;
 select public.admin_set_notifications(false);
 reset role;
 select tests.eq(public.run_daily_notifications()::text, '{"enabled": false}', 'switched off');
+
+-- ---------------------------------------------------------------------------
+-- Leads confirm who joins (0012)
+-- ---------------------------------------------------------------------------
+
+\set lead 'a0000000-0000-0000-0000-000000000031'
+\set hand1 'a0000000-0000-0000-0000-000000000032'
+\set hand2 'a0000000-0000-0000-0000-000000000033'
+\set roster 'a0000000-0000-0000-0000-000000000034'
+insert into auth.users (id, email) values
+  (:'lead', 'lena.lead@ems-wi.com'), (:'hand1', 'hal.hand@ems-wi.com'),
+  (:'hand2', 'hope.hand@ems-wi.com'), (:'roster', 'rory.roster@ems-wi.com');
+update public.profiles set full_name = 'Lena Lead', role = 'poster', position = 'partner' where id = :'lead';
+update public.profiles set full_name = 'Hal Hand', position = 'employed_physician' where id in (:'hand1');
+update public.profiles set full_name = 'Hope Hand', position = 'employed_physician' where id in (:'hand2');
+update public.profiles set full_name = 'Rory Roster', position = 'partner' where id = :'roster';
+insert into public.opportunities (title, region, capacity, created_by)
+values ('Peer Review Committee', 'group_wide', 2, :'lead');
+select id as prc_id from public.opportunities where title = 'Peer Review Committee' \gset
+
+set request.jwt.claim.sub = :'hand1';
+set role authenticated;
+select public.set_my_signup(:'prc_id', 'interested');
+reset role;
+set request.jwt.claim.sub = :'hand2';
+set role authenticated;
+select public.set_my_signup(:'prc_id', 'interested');
+reset role;
+select id as hand1_prc from public.signups where user_id = :'hand1' and opportunity_id = :'prc_id' \gset
+select id as hand2_prc from public.signups where user_id = :'hand2' and opportunity_id = :'prc_id' \gset
+
+-- Lead adds a current member by email, chooses Not this time for another.
+set request.jwt.claim.sub = :'lead';
+set role authenticated;
+select tests.eq(public.owner_add_member(:'prc_id', ' Rory.Roster@ems-wi.com '), 'added', 'lead adds a current member by email');
+select tests.eq(public.owner_add_member(:'prc_id', 'rory.roster@ems-wi.com'), 'already', 'adding twice is harmless');
+select tests.expect_error(format($$select public.owner_add_member(%L, 'never.signed@ems-wi.com')$$, :'prc_id'), 'This person has not signed in yet%');
+select public.owner_decide_signup(:'hand2_prc', 'not_selected');
+select tests.eq(public.owner_decide_signup(:'hand1_prc', 'confirm')::text, 'committed', 'lead confirms a raised hand');
+select tests.expect_error(format($$select public.owner_add_member(%L, 'poster@ems-wi.com')$$, :'prc_id'), 'All 2 seats are filled%');
+reset role;
+select tests.eq((select status::text from public.signups where user_id = :'roster' and opportunity_id = :'prc_id'), 'committed', 'added member is confirmed');
+
+-- Not this time: hidden from other members and from public counts.
+update public.opportunities set show_names = true where id = :'prc_id';
+set request.jwt.claim.sub = :'doc';
+set role authenticated;
+select tests.eq((select count(*)::text from public.signups where opportunity_id = :'prc_id'), '2', 'others see only confirmed names');
+select tests.eq((select committed || '/' || interested from public.opportunity_counts() where opportunity_id = :'prc_id'), '2/0', 'counts leave out Not this time');
+reset role;
+
+-- The member sees their own status and can raise a hand again.
+set request.jwt.claim.sub = :'hand2';
+set role authenticated;
+select tests.eq((select status::text from public.signups where id = :'hand2_prc'), 'not_selected', 'member sees their own status');
+select tests.eq(public.set_my_signup(:'prc_id', 'interested')::text, 'interested', 'member raises a hand again');
+select tests.eq(public.set_my_signup(:'prc_id', 'withdrawn')::text, 'withdrawn', 'and can take it down');
+reset role;
+
+-- Leads can still decide after the deadline or once the post is closed.
+set request.jwt.claim.sub = :'lead';
+set role authenticated;
+select public.owner_decide_signup(:'hand1_prc', 'undo');
+reset role;
+update public.opportunities set status = 'closed', signup_deadline = date '2020-01-01' where id = :'prc_id';
+set request.jwt.claim.sub = :'lead';
+set role authenticated;
+select tests.eq(public.owner_decide_signup(:'hand1_prc', 'confirm')::text, 'committed', 'lead decides after closing');
+reset role;
+update public.opportunities set status = 'open', signup_deadline = null where id = :'prc_id';
+
+-- Other owners' posts are off limits.
+set request.jwt.claim.sub = :'lead';
+set role authenticated;
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'undo')$$, :'mem1_signup'), 'Only the post''s owners or an admin%');
+reset role;
+
+-- Reminder emails only cover people still waiting (Interested).
+set request.jwt.claim.sub = :'hand2';
+set role authenticated;
+select public.set_my_signup(:'prc_id', 'interested');
+reset role;
+update public.signups set status_changed_at = now() - interval '22 days', nudged_at = null, contacted_at = null where opportunity_id = :'prc_id';
+update public.notification_settings set enabled = true, daily_cap = 150;
+select count(*) as sent_before from net.sent \gset
+select public.run_daily_notifications();
+select tests.eq((select string_agg(body #>> '{to,0,email}', ',' order by body #>> '{to,0,email}') from net.sent where id > :sent_before and body ->> 'subject' = 'Following up: Peer Review Committee'),
+  'hope.hand@ems-wi.com', 'follow-ups skip confirmed people');
+select tests.eq((select (position('raised your hand' in body ->> 'htmlContent') > 0)::text from net.sent where id > :sent_before and body ->> 'subject' = 'Following up: Peer Review Committee'), 'true', 'follow-up wording');
+select (date '2026-01-05' + s.slot + 14 * ceil((public.local_today() + 60 - date '2026-01-05' - s.slot) / 14.0)::integer)::text as lead_day
+from (select mod(('x' || substr(md5(:'lead'), 1, 7))::bit(28)::integer, 14) as slot) s \gset
+update public.signups set status_changed_at = now(), nudged_at = now() where opportunity_id = :'prc_id';
+select public.run_daily_notifications((:'lead_day' || ' 08:00 America/Chicago')::timestamptz);
+select tests.eq((select details ->> 'people' from public.notification_log where kind = 'owner_digest' and user_id = :'lead' order by id desc limit 1), '1', 'digest lists only people waiting for a decision');
+update public.notification_settings set enabled = false;
 
 \o

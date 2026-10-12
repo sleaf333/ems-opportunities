@@ -159,12 +159,23 @@ What the safety net cannot stop: someone with access to the Supabase dashboard r
 - [ ] Never use **Delete user** in Supabase.
 - [ ] Once the group relies on the site, move to Supabase Pro for automatic daily backups (see below).
 
+## How joining works (for committee leads)
+
+Members cannot add themselves to anything. They raise a hand (**I'm interested**), and the post's lead decides.
+
+- **Leads are the post's owners.** Add each committee chair as an owner on the post page (Owners box). Posts with no owner can only be decided by site admins.
+- On **My posts**, each person who raised a hand has **Confirm** and **Not this time**, plus a **Contacted** tick. Both decisions can be undone.
+- **Not this time** shows the member "Reviewed by the lead", never "rejected". Please tell them personally. They can raise a hand again while the post is open.
+- **Already on the committee?** Add them by email under "Already on this? Add them by email" (they must have signed in once). They are added as confirmed.
+- **Seats:** if the post has a seat count, Confirm stops when it is full. Raise the count with **Edit**, or move someone back first.
+- Confirmed members can **step off** themselves; the site asks them to let the lead know.
+
 ## Automatic emails (reminders)
 
 The site can send two kinds of reminder email. Nothing is sent until a site admin turns it on (Admin page, **Email reminders**).
 
-- **Owners:** about every two weeks, a summary of people who raised a hand on their open posts and are not ticked **Contacted** yet on My posts. Only sent when someone is waiting. Owners are spread across the 14 days, so the group's emails do not all go out on one day.
-- **Members:** one follow-up, three weeks after they mark Interested or Commit, if no owner has ticked them Contacted. It lists the post's contacts (or its owners if it has none). Sign-ups older than six weeks are never followed up, so turning emails on does not flood anyone about old sign-ups.
+- **Owners:** about every two weeks, a summary of people who raised a hand on their open posts and are still waiting for a decision (not confirmed, not Not this time, not ticked **Contacted**). Only sent when someone is waiting. Owners are spread across the 14 days, so the group's emails do not all go out on one day.
+- **Members:** one follow-up, three weeks after they raise a hand, if the lead has not confirmed them, chosen Not this time, or ticked them Contacted. It lists the post's contacts (or its owners if it has none). Sign-ups older than six weeks are never followed up, so turning emails on does not flood anyone about old sign-ups.
 - Anyone can turn these off on their **Profile**. Sign-in codes are not affected.
 - At most **150 a day** (the rest wait for the next morning), so sign-in codes always have room in Brevo's free 300.
 - A schedule inside the database runs the check every morning (about 8am in summer, 7am in winter).

@@ -8,7 +8,7 @@ export interface EmailGroup {
   people: Profile[]
 }
 
-// One row per group (Committed, Waitlist, Interested, and Everyone when there
+// One row per group (for example Confirmed and Waiting, and Everyone when there
 // is more than one group): Copy puts the addresses on the clipboard for
 // pasting into Bcc (works with Outlook on the web), Email opens the
 // computer's default mail app. "Open Outlook on the web" starts a new message.

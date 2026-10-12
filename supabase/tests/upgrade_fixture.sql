@@ -31,4 +31,7 @@ update public.opportunities set created_by = 'b0000000-0000-0000-0000-0000000000
 insert into public.signups (opportunity_id, user_id, status)
 select id, 'b0000000-0000-0000-0000-000000000005', 'committed'
 from public.opportunities where title = 'Finance Committee';
+insert into public.signups (opportunity_id, user_id, status)
+select id, 'b0000000-0000-0000-0000-000000000002', 'waitlisted'
+from public.opportunities where title = 'Trauma';
 \o

@@ -11,8 +11,8 @@ import type { MemberPosition, Opportunity, OppRegion, Profile, SignupEvent, Sign
 // Points for each sign-up change when scoring involvement.
 export const WEIGHTS: Partial<Record<SignupStatus, number>> = {
   interested: 1,
-  committed: 3,
-  waitlisted: 3, // wanted to commit; the post was full
+  committed: 3, // confirmed by the post's lead
+  waitlisted: 3, // before 0012: wanted to commit; the post was full
   completed: 5, // counts once attendance marking exists
 }
 // Extra points when the post is a leadership role or tagged Leadership.
@@ -134,7 +134,7 @@ export function funnel(
   const stages: FunnelStage[] = [
     { key: 'members', label: 'Signed in', count: people.size },
     { key: 'raised', label: 'Raised a hand', count: raised.size },
-    { key: 'committed', label: 'Committed', count: committed.size },
+    { key: 'committed', label: 'Confirmed', count: committed.size },
     { key: 'returned', label: 'Came back (2+ commitments)', count: returned },
   ]
   // Only once attendance is being recorded anywhere.
