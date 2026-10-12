@@ -72,9 +72,10 @@ export default function EmailReminders() {
     setMessage(null)
     setActionError(null)
     const { error: rpcError } = await action()
+    // Refresh first, so the message and the On/Off badge change together.
+    await reload()
     if (rpcError) setActionError(friendlyError(rpcError))
     else setMessage(done)
-    await reload()
     setBusy(false)
   }
 
