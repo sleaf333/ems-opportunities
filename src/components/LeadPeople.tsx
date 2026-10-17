@@ -35,10 +35,14 @@ export default function LeadPeople({
   const [added, setAdded] = useState<string | null>(null)
 
   // Fresh data from the database replaces what was shown in the meantime.
+  // Keyed on the content, not the array: My posts hands over a new array on
+  // every render (including the one when a reload starts), which made a
+  // just-clicked decision flash back to its old state.
+  const fresh = signups.map((s) => `${s.id}:${s.status}:${s.contacted_at ?? ''}`).join('|')
   useEffect(() => {
     setStatus({})
     setContacted({})
-  }, [signups])
+  }, [fresh])
 
   const statusOf = (s: Signup) => status[s.id] ?? s.status
   const contactedOf = (s: Signup) => (s.id in contacted ? contacted[s.id] : s.contacted_at)

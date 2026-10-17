@@ -8,9 +8,13 @@
 --
 -- Removed: every sign-up those people made (and its history), and, if the
 -- first setting is on, every post they created (with all sign-ups on it).
+-- Removed too: a lead's Confirm or "Not this time" on a tester, and any
+-- Contacted tick on a tester's sign-up (they go with the sign-up), which frees
+-- the tester's seat on posts with limited seats.
 -- Kept: their accounts, positions, interests and goals; every post they did
--- not create (including posts they co-own); everyone else's sign-ups. If a
--- tester held a spot on a post with limited spots, the waitlist moves up.
+-- not create (including posts they co-own); everyone else's sign-ups.
+-- Do not include your own email unless you want your own sign-ups and posts
+-- cleared too.
 --
 -- Safe to run twice: a second run finds nothing left to clear.
 drop table if exists pg_temp.pilot_clear_result;
