@@ -299,3 +299,6 @@ export function mergeContacts(current: Contact[], extra: Contact[]): Contact[] {
   const emails = new Set(kept.map((c) => c.email.trim().toLowerCase()).filter(Boolean))
   return [...kept, ...extra.filter((c) => !emails.has(c.email.trim().toLowerCase()))]
 }
+
+// Site help contact: shown wherever someone might get stuck (HelpContact).
+export const HELP_CONTACT = { name: 'Sam Leaf', email: 'samuel.leaf@ems-wi.com' }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import HelpContact from './HelpContact'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import BrandLogo from './BrandLogo'
@@ -78,6 +79,7 @@ export default function Layout() {
         <span className="footer-mission">Built to connect people with opportunities and help every interest grow.</span>
         <Link to="/privacy">What we track and who sees it</Link>
         <span>Never post patient information on this site.</span>
+        <HelpContact />
       </footer>
     </div>
   )

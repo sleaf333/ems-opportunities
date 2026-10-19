@@ -2126,6 +2126,9 @@ tr.expanded td {
 }
 
 /* Footer: the site's purpose, in the tagline voice, on its own line. */
+.help-contact a {
+  overflow-wrap: anywhere;
+}
 .footer-mission {
   flex-basis: 100%;
   font-family: var(--font-serif);
