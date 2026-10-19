@@ -1890,6 +1890,27 @@ tr.expanded td {
   border-top: 1px solid var(--hairline);
 }
 
+/* Admin: long lists that scroll inside their own box */
+.scroll-list {
+  max-height: 24rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 0.25rem 0.75rem;
+}
+#waiting summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+.inline-heading {
+  display: inline;
+  font-size: 1.15rem;
+}
+.waiting-body {
+  margin-top: 0.75rem;
+}
+
 /* Admin: email reminders */
 .badge-on {
   background: var(--success-soft);
