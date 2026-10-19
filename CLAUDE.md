@@ -27,6 +27,7 @@ Project owner is not a professional developer; explain changes in plain language
 - After launch, schema changes go in a new numbered migration; never edit an applied one.
 - Checks before pushing: `npm run build`, `npm run test:unit` (Vitest, pure logic such as `src/lib/insights.test.ts`) and `npm run test:db` (add tests to `supabase/tests/permissions_test.sql` for new rules).
 - Admin Insights (`/admin/insights`): all math lives in `src/lib/insights.ts` (tuning constants at the top); charts are hand-made SVG in `src/components/insights/`. Chart colors `--series-interest` / `--series-commit` passed the dataviz palette validator for light and dark surfaces; re-run it if they change. Funnel and heatmap use one hue (brand) in steps.
+- Site help contact (Sam Leaf, samuel.leaf@ems-wi.com) is `HELP_CONTACT` in src/lib/format.ts, shown by `HelpContact` in the footer, sign-in page, LoadError and the What we track page; change it there only.
 - Writing for the owner or the group: no em dashes.
 - Supabase grants anon/authenticated EXECUTE on new public functions by default: in each new migration, revoke from public/anon/authenticated and grant back only what the site calls.
 - Motion: JS effects (`Celebrate`, `CountUp`, `src/lib/motion.ts`) must check `prefersReducedMotion()`; the CSS reduce-motion rule only stops CSS animations. The burst draws in a fixed, overflow-hidden, pointer-events-none layer so it never scrolls the page or blocks clicks.

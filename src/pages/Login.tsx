@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import HelpContact from '../components/HelpContact'
 import BrandLogo from '../components/BrandLogo'
 import { EMAIL_DOMAIN, friendlyError, isAllowedEmail, supabase } from '../lib/supabase'
 
@@ -122,6 +123,9 @@ export default function Login() {
         <p className="small muted">
           You stay signed in on this device until you sign out.{' '}
           <Link to="/privacy">What we track and who sees it</Link>
+        </p>
+        <p className="small muted">
+          <HelpContact lead="Trouble signing in or a question?" />
         </p>
       </div>
     </div>

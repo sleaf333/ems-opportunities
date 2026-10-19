@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import HelpContact from '../components/HelpContact'
 import { useAuth } from '../auth/AuthContext'
 
 export default function Privacy() {
@@ -76,7 +77,9 @@ export default function Privacy() {
           their end date but are not deleted.
         </p>
 
-        <p className="small muted">Questions? Contact an admin.</p>
+        <p className="small muted">
+          <HelpContact lead="Questions about what is tracked?" />
+        </p>
         {!session && <Link to="/">Back to sign in</Link>}
       </article>
     </div>

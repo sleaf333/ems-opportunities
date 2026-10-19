@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import HelpContact from './HelpContact'
 
 // Shown when a page still can't load after the automatic retries: a plain
 // message and a Try again button, instead of a dead end.
@@ -24,6 +25,9 @@ export default function LoadError({ what, error, onRetry }: { what: string; erro
         </button>
       </div>
       <p className="small muted">Details: {error}</p>
+      <p className="small muted">
+        <HelpContact lead="Still not working after a few tries?" />
+      </p>
     </div>
   )
 }
