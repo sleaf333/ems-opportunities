@@ -112,6 +112,10 @@ From now on, every change merged into `main` on GitHub redeploys the site automa
 - **Shareholders** choose Shareholder as their position when they first sign in. If someone picks the wrong position, fix it on the Admin page (**Change role** on their row, tick or untick **Shareholder**, **Save**).
 - **Share the link** in the newsletter.
 
+## Setting committee leads in bulk
+
+`supabase/scripts/set_committee_leads.sql` sets each committee's lead (owner) and contact from a list of last names, creates committees that are not on the site yet, and merged Chart Reviews with Missing Charts. Run migration 0013 first. Run the script once as is (a preview that changes nothing), check that every last name found the right email, then change `v_apply boolean := false` to `true` and run it again. If any row is marked `!!`, nothing changes: replace that last name with the person's full email and run again. Leads who have not signed in yet become owners the first time they sign in. To change one post's owners later, use the Owners box on the post page.
+
 ## Setting positions from a list
 
 To set many people's positions at once (for example from an Outlook distribution list), use the scripts in `supabase/scripts/`. Open one on GitHub, copy it, paste it into **SQL Editor > New query**, replace the line `PASTE THE EMAILS HERE` with your list (any format, names are ignored), and click **Run**. Each script reports what it found and changed, never changes anyone's role, and is safe to run more than once. People who have not signed in yet get the position in advance (shown on the Admin page under "Waiting for first sign-in").

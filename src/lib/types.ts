@@ -108,6 +108,15 @@ export interface OpportunityOwner {
   added_at: string
 }
 
+// Someone named as an owner before their first sign-in (0013); they become
+// an owner automatically when they first sign in. Admins and owners only.
+export interface OwnerPreset {
+  email: string
+  opportunity_id: string
+  added_by: string | null
+  created_at: string
+}
+
 // Previous values of a post's changed fields (admins only).
 export interface OpportunityChange {
   id: number

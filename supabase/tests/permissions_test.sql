@@ -512,7 +512,12 @@ set request.jwt.claim.sub = :'owner2';
 set role authenticated;
 select tests.eq(public.add_opportunity_owner(:'fair_id', 'doc@ems-wi.com'), 'added', 'owner adds a member as co-owner');
 select tests.eq(public.add_opportunity_owner(:'fair_id', 'doc@ems-wi.com'), 'already', 'adding twice is harmless');
-select tests.expect_error(format($$select public.add_opportunity_owner(%L, 'nobody@ems-wi.com')$$, :'fair_id'), 'This person has not signed in yet%');
+-- Not signed in yet: they wait, and can be cancelled (0013).
+select tests.eq(public.add_opportunity_owner(:'fair_id', ' Nobody@ems-wi.com '), 'pending', 'owner names someone who has not signed in');
+select tests.eq(public.add_opportunity_owner(:'fair_id', 'nobody@ems-wi.com'), 'already_pending', 'naming them twice is harmless');
+select tests.expect_error(format($$select public.add_opportunity_owner(%L, 'someone@gmail.com')$$, :'fair_id'), 'Email must end in @ems-wi.com%');
+select public.remove_owner_preset(:'fair_id', 'nobody@ems-wi.com');
+select tests.eq((select count(*)::text from public.owner_presets), '0', 'owner cancels a waiting owner');
 reset role;
 select tests.eq((select role::text from public.profiles where id = :'doc'), 'member', 'owner-added co-owner is not made a poster');
 
@@ -636,7 +641,7 @@ set request.jwt.claim.sub = :'admin';
 set role authenticated;
 select tests.eq(
   (select string_agg(k, ',' order by k) from jsonb_object_keys(public.admin_export_all()) k),
-  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,notification_log,notification_settings,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,post_requests,profiles,role_changes,schema_version,signup_events,signups',
+  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,notification_log,notification_settings,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,owner_presets,post_requests,profiles,role_changes,schema_version,signup_events,signups',
   'backup has every table');
 select tests.eq(
   (select jsonb_array_length(public.admin_export_all() -> 'signup_events')::text),
@@ -646,7 +651,7 @@ reset role;
 -- If this fails, a new table was added: put it in admin_export_all.
 select tests.eq(
   (select count(*)::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'),
-  '17', 'backup covers every table in the database');
+  '18', 'backup covers every table in the database');
 
 -- Deleting people or posts with activity is blocked (as the Supabase dashboard would).
 select tests.expect_error(format($$delete from auth.users where id = %L$$, :'doc'), '%violates foreign key constraint%');
@@ -1097,5 +1102,48 @@ update public.signups set status_changed_at = now(), nudged_at = now() where opp
 select public.run_daily_notifications((:'lead_day' || ' 08:00 America/Chicago')::timestamptz);
 select tests.eq((select details ->> 'people' from public.notification_log where kind = 'owner_digest' and user_id = :'lead' order by id desc limit 1), '1', 'digest lists only people waiting for a decision');
 update public.notification_settings set enabled = false;
+
+-- ---------------------------------------------------------------------------
+-- Owners named before their first sign-in (0013)
+-- ---------------------------------------------------------------------------
+
+select id as wait_opp from public.opportunities where title = 'Peer Review Committee' \gset
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select tests.eq(public.add_opportunity_owner(:'wait_opp', 'Future.Lead@ems-wi.com'), 'pending', 'admin names a future lead');
+select tests.eq((select count(*)::text from public.owner_presets where email = 'future.lead@ems-wi.com'), '1', 'admin sees who is waiting');
+reset role;
+
+-- Other members cannot see or change waiting owners.
+set request.jwt.claim.sub = :'doc';
+set role authenticated;
+select tests.eq((select count(*)::text from public.owner_presets), '0', 'members cannot see waiting owners');
+select tests.expect_error(format($$select public.remove_owner_preset(%L, 'future.lead@ems-wi.com')$$, :'wait_opp'), 'Only this post''s owners or an admin%');
+select tests.expect_error($$insert into public.owner_presets (email, opportunity_id) values ('x@ems-wi.com', gen_random_uuid())$$, 'permission denied%');
+reset role;
+set role anon;
+select tests.expect_error(format($$select public.remove_owner_preset(%L, 'future.lead@ems-wi.com')$$, :'wait_opp'), 'permission denied%');
+reset role;
+
+-- The post's current owner sees them too.
+set request.jwt.claim.sub = :'lead';
+set role authenticated;
+select tests.eq((select count(*)::text from public.owner_presets where opportunity_id = :'wait_opp'), '1', 'owners see who is waiting on their post');
+reset role;
+
+-- First sign-in makes them an owner, logged, and the wait is cleared.
+insert into auth.users (id, email) values ('a0000000-0000-0000-0000-000000000041', 'future.lead@ems-wi.com');
+select tests.eq((select count(*)::text from public.opportunity_owners where opportunity_id = :'wait_opp' and user_id = 'a0000000-0000-0000-0000-000000000041'), '1', 'becomes an owner at first sign-in');
+select tests.eq((select count(*)::text from public.owner_presets), '0', 'waiting entry cleared');
+select tests.eq((select action from public.owner_changes where user_id = 'a0000000-0000-0000-0000-000000000041' order by id desc limit 1), 'added', 'logged as an ownership change');
+select tests.eq((select added_by::text from public.opportunity_owners where user_id = 'a0000000-0000-0000-0000-000000000041'), :'admin', 'remembers who named them');
+
+-- A waiting owner goes away with the post.
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.add_opportunity_owner(:'wait_opp', 'later.lead@ems-wi.com');
+reset role;
+select tests.eq(left(public.erase_opportunity_permanently(:'wait_opp'), 8), 'Erased "', 'erase a post with a waiting owner');
+select tests.eq((select count(*)::text from public.owner_presets), '0', 'waiting owners erased with the post');
 
 \o
