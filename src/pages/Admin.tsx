@@ -3,6 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Check, Download, Mail, X } from 'lucide-react'
 import { useAuth, useProfile } from '../auth/AuthContext'
 import AdminTabs from '../components/AdminTabs'
+import ConfirmAction from '../components/ConfirmAction'
 import EmailReminders from '../components/EmailReminders'
 import LoadError from '../components/LoadError'
 import { type AdminData, BLANK_ENGAGEMENT, type Engagement, engagementByPerson, loadAdminData } from '../lib/adminData'
@@ -27,7 +28,7 @@ import {
   TYPE_LABELS,
 } from '../lib/format'
 import { EMAIL_DOMAIN, friendlyError, isAllowedEmail, supabase } from '../lib/supabase'
-import type { InterestCategory, Opportunity, Profile, Signup, UserRole } from '../lib/types'
+import type { InterestCategory, MemberPreset, Opportunity, Profile, Signup, UserRole } from '../lib/types'
 
 // Posts leaving the site within this many days are flagged for review.
 const ENDING_SOON_DAYS = 14
@@ -84,6 +85,14 @@ export default function Admin() {
         engagement={engagement}
         onChangeRole={(p) => {
           setRoleDraft({ email: p.email, role: p.role, partner: p.position === 'partner' })
+          document.getElementById('roles')?.scrollIntoView({ behavior: 'smooth' })
+        }}
+      />
+      <WaitingForSignIn
+        data={data}
+        reload={reload}
+        onChange={(p) => {
+          setRoleDraft({ email: p.email, role: p.role, partner: p.is_partner })
           document.getElementById('roles')?.scrollIntoView({ behavior: 'smooth' })
         }}
       />
@@ -362,12 +371,6 @@ function MemberRoles({
     data.profiles.find((x) => x.email === typed)?.role ?? data.presets.find((x) => x.email === typed)?.role
   const grantingAdmin = role === 'admin' && currentRole !== 'admin'
 
-  async function removePreset(presetEmail: string) {
-    const { error: deleteError } = await supabase.from('member_presets').delete().eq('email', presetEmail)
-    if (deleteError) setError(friendlyError(deleteError))
-    await reload()
-  }
-
   return (
     <form id="roles" className="card stack" onSubmit={save}>
       <div>
@@ -440,35 +443,10 @@ function MemberRoles({
       {error && <p className="error" role="alert">{error}</p>}
 
       {data.presets.length > 0 && (
-        <div>
-          <h3>Waiting for first sign-in</h3>
-          <ul className="list">
-            {data.presets.map((p) => (
-              <li key={p.email} className="row between wrap gap-sm">
-                <span>
-                  {p.email} · {ROLE_LABELS[p.role]}
-                  {p.position ? ` · ${POSITION_LABELS[p.position]}` : p.is_partner ? ' · Shareholder' : ''}
-                </span>
-                <span className="row gap-sm">
-                  <button
-                    type="button"
-                    className="btn btn-link"
-                    onClick={() => {
-                      setEmail(p.email)
-                      setRole(p.role)
-                      setPartner(p.is_partner)
-                    }}
-                  >
-                    Change
-                  </button>
-                  <button type="button" className="btn btn-link danger" onClick={() => void removePreset(p.email)}>
-                    Remove
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <p className="small muted">
+          {data.presets.length} {data.presets.length === 1 ? 'person is' : 'people are'} set up in advance and waiting
+          for their first sign-in. <a href="#waiting">See the list</a> at the bottom of this page.
+        </p>
       )}
 
       {data.recentRoleChanges.length > 0 && (
@@ -499,6 +477,80 @@ function MemberRoles({
         </div>
       )}
     </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+// Everyone set up in advance (positions and roles from the bulk lists) who
+// has not signed in yet. Hundreds of rows and rarely touched, so it sits at
+// the bottom, closed, and scrolls inside its own box.
+function WaitingForSignIn({
+  data,
+  reload,
+  onChange,
+}: {
+  data: AdminData
+  reload: () => Promise<void>
+  onChange: (preset: MemberPreset) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  if (data.presets.length === 0) return null
+
+  const term = search.trim().toLowerCase()
+  const shown = term ? data.presets.filter((p) => p.email.includes(term)) : data.presets
+
+  async function remove(presetEmail: string) {
+    setError(null)
+    const { error: deleteError } = await supabase.from('member_presets').delete().eq('email', presetEmail)
+    if (deleteError) setError(friendlyError(deleteError))
+    await reload()
+  }
+
+  return (
+    <section id="waiting" className="card stack-sm">
+      <details>
+        <summary>
+          <h2 className="inline-heading">Waiting for first sign-in ({data.presets.length})</h2>
+        </summary>
+        <div className="stack-sm waiting-body">
+          <p className="small muted">
+            People set up in advance (position and site role) who have not signed in yet. Their settings apply the
+            first time they sign in. Use Change to edit one in "Site roles and shareholder status" above.
+          </p>
+          <label className="field field-narrow">
+            <span>Find by email</span>
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. smith" />
+          </label>
+          {error && <p className="error" role="alert">{error}</p>}
+          <ul className="list scroll-list">
+            {shown.map((p) => (
+              <li key={p.email} className="row between wrap gap-sm">
+                <span>
+                  {p.email} · {ROLE_LABELS[p.role]}
+                  {p.position ? ` · ${POSITION_LABELS[p.position]}` : p.is_partner ? ' · Shareholder' : ''}
+                </span>
+                <span className="row gap-sm">
+                  <button type="button" className="btn btn-link" onClick={() => onChange(p)}>
+                    Change
+                  </button>
+                  <ConfirmAction
+                    label="Remove"
+                    ariaLabel={`Remove ${p.email} from the waiting list`}
+                    question={`Remove ${p.email}?`}
+                    detail="Their preset position and site role are dropped; they can still sign in later as a regular member."
+                    confirmLabel="Yes, remove"
+                    onConfirm={() => remove(p.email)}
+                  />
+                </span>
+              </li>
+            ))}
+            {shown.length === 0 && <li className="muted small">No one matches "{search}".</li>}
+          </ul>
+        </div>
+      </details>
+    </section>
   )
 }
 
