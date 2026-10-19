@@ -60,7 +60,7 @@ import {
   TYPE_LABELS,
 } from '../lib/format'
 import { friendlyError, supabase } from '../lib/supabase'
-import type { OpportunityChange, OpportunityOwner, Profile, Signup, SignupStatus } from '../lib/types'
+import type { OpportunityChange, OpportunityOwner, OwnerPreset, Profile, Signup, SignupStatus } from '../lib/types'
 
 export default function OpportunityDetail() {
   const { id = '' } = useParams()
@@ -87,7 +87,11 @@ export default function OpportunityDetail() {
       if (result.error) throw new Error(result.error.message)
       history = result.data as OpportunityChange[]
     }
-    return [opp, signups, profiles, counts.get(id), topics, owners, history] as const
+    // Owners named before their first sign-in (0013). Only admins and owners
+    // get rows back; any error (for example before 0013 is run) shows none.
+    const waiting = await supabase.from('owner_presets').select('*').eq('opportunity_id', id).order('email')
+    const pending = waiting.error ? [] : (waiting.data as OwnerPreset[])
+    return [opp, signups, profiles, counts.get(id), topics, owners, history, pending] as const
   }, [id, profile.role])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -112,7 +116,7 @@ export default function OpportunityDetail() {
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
-  const [opp, signups, profiles, counts, topics, owners, history] = data
+  const [opp, signups, profiles, counts, topics, owners, history, pending] = data
   if (!opp) {
     return (
       <div className="card">
@@ -400,6 +404,7 @@ export default function OpportunityDetail() {
             <OwnersPanel
               opportunityId={opp.id}
               owners={owners}
+              pending={pending}
               people={people}
               me={profile.id}
               isAdmin={isAdmin}
@@ -475,6 +480,7 @@ function profilesOf(rows: Signup[], people: Map<string, Profile>): Profile[] {
 function OwnersPanel({
   opportunityId,
   owners,
+  pending,
   people,
   me,
   isAdmin,
@@ -483,6 +489,7 @@ function OwnersPanel({
 }: {
   opportunityId: string
   owners: OpportunityOwner[]
+  pending: OwnerPreset[]
   people: Map<string, Profile>
   me: string
   isAdmin: boolean
@@ -514,6 +521,10 @@ function OwnersPanel({
     setNotice(
       result === 'already'
         ? `${typed} is already an owner.`
+        : result === 'pending'
+          ? `${typed} has not signed in yet. They will become a co-owner automatically the first time they sign in.`
+          : result === 'already_pending'
+            ? `${typed} is already waiting to sign in.`
         : result === 'added_poster'
           ? `${typed} is now a co-owner. They were also made a poster.`
           : `${typed} is now a co-owner. They can edit this post and see every name on it.`,
@@ -529,6 +540,22 @@ function OwnersPanel({
     const { error: rpcError } = await supabase.rpc('admin_remove_opportunity_owner', {
       p_opportunity_id: opportunityId,
       p_user_id: owner.user_id,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    await onChange()
+  }
+
+  async function cancelWaiting(waitingEmail: string) {
+    setError(null)
+    setNotice(null)
+    setBusy(true)
+    const { error: rpcError } = await supabase.rpc('remove_owner_preset', {
+      p_opportunity_id: opportunityId,
+      p_email: waitingEmail,
     })
     setBusy(false)
     if (rpcError) {
@@ -596,6 +623,29 @@ function OwnersPanel({
           })}
         </ul>
       )}
+      {pending.length > 0 && (
+        <div className="stack-sm">
+          <h3 className="small">Waiting to sign in</h3>
+          <ul className="people">
+            {pending.map((p) => (
+              <li key={p.email}>
+                <span className="owner-name muted">{p.email}</span>
+                <ConfirmAction
+                  label="Cancel"
+                  ariaLabel={`Cancel ${p.email} as an owner`}
+                  className="btn btn-link danger small"
+                  question={`Cancel ${p.email} as an owner?`}
+                  detail="They will not become an owner when they sign in."
+                  confirmLabel="Yes, cancel"
+                  cancelLabel="Keep"
+                  disabled={busy}
+                  onConfirm={() => cancelWaiting(p.email)}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <form className="stack-sm" onSubmit={(e) => void add(e)}>
         <label className="field">
           <span>Add a co-owner by work email</span>
@@ -612,8 +662,8 @@ function OwnersPanel({
         </button>
       </form>
       <p className="small muted">
-        Owners can edit this post, see every name on it and email those people. A new co-owner must have signed in to
-        the site at least once.{' '}
+        Owners can edit this post, see every name on it and email those people. Someone who has not signed in yet
+        becomes a co-owner the first time they sign in.{' '}
         {isAdmin
           ? 'Only admins can remove someone else.'
           : owners.length > 1
