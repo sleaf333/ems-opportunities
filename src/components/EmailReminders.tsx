@@ -8,7 +8,7 @@ import { friendlyError, supabase } from '../lib/supabase'
 // What admin_notification_status() returns (0011).
 interface LogRow {
   id: number
-  kind: 'owner_digest' | 'member_nudge' | 'test' | 'setting'
+  kind: 'owner_digest' | 'member_nudge' | 'test' | 'setting' | 'roster_check'
   status: 'queued' | 'sent' | 'failed' | 'unknown' | 'done'
   status_code: number | null
   error: string | null
@@ -40,6 +40,7 @@ const KIND_LABELS: Record<LogRow['kind'], string> = {
   member_nudge: 'Follow-up',
   test: 'Test email',
   setting: 'Switched',
+  roster_check: 'Member list check',
 }
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`

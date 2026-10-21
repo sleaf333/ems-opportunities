@@ -1,28 +1,42 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Check, UserPlus } from 'lucide-react'
 import ConfirmAction from './ConfirmAction'
+import PersonPicker from './PersonPicker'
 import { displayName, formatDate, POSITION_LABELS } from '../lib/format'
 import { friendlyError, supabase } from '../lib/supabase'
-import type { Opportunity, Profile, Signup, SignupStatus } from '../lib/types'
+import type { Opportunity, PendingMember, Profile, RosterCheck, Signup, SignupStatus } from '../lib/types'
 
-type Decision = 'confirm' | 'not_selected' | 'undo'
+type Decision = 'confirm' | 'not_selected' | 'undo' | 'remove'
 
-const AFTER: Record<Decision, SignupStatus> = { confirm: 'committed', not_selected: 'not_selected', undo: 'interested' }
+const AFTER: Record<Decision, SignupStatus> = {
+  confirm: 'committed',
+  not_selected: 'not_selected',
+  undo: 'interested',
+  remove: 'withdrawn',
+}
+
+// Leads are asked to confirm their member list once a year.
+const CHECK_DUE_DAYS = 335
 
 // What a post's lead (its owners, or a site admin) uses to decide who joins:
 // Confirm or Not this time for each raised hand, a Contacted tick, Undo, and
-// adding people already on the committee by email. The database
-// (owner_decide_signup, owner_add_member, set_contacted) enforces who may do
-// this; this only shows the buttons.
+// adding people already on the committee (even before they sign in), Remove,
+// and the once-a-year "List is up to date". The database (owner_decide_signup,
+// owner_add_member, set_contacted, confirm_roster) enforces who may do this;
+// this only shows the buttons.
 export default function LeadPeople({
   opp,
   signups,
   people,
+  pending = [],
+  lastCheck = null,
   onChanged,
 }: {
   opp: Opportunity
   signups: Signup[]
   people: Map<string, Profile>
+  pending?: PendingMember[]
+  lastCheck?: RosterCheck | null
   onChanged: () => Promise<void>
 }) {
   // Changes made here, shown straight away while the page reloads.
@@ -33,6 +47,7 @@ export default function LeadPeople({
   const [email, setEmail] = useState('')
   const [adding, setAdding] = useState(false)
   const [added, setAdded] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
 
   // Fresh data from the database replaces what was shown in the meantime.
   // Keyed on the content, not the array: My posts hands over a new array on
@@ -97,10 +112,47 @@ export default function LeadPeople({
       setError(friendlyError(rpcError))
       return
     }
-    setAdded(data === 'already' ? `${typed} is already confirmed.` : `Added ${typed} as confirmed.`)
+    setAdded(
+      data === 'already'
+        ? `${typed} is already on the list.`
+        : data === 'pending'
+          ? `${typed} has not signed in yet. They will be added automatically the first time they sign in.`
+          : data === 'already_pending'
+            ? `${typed} is already waiting to sign in.`
+            : `Added ${typed} to the member list.`,
+    )
     setEmail('')
     await onChanged()
   }
+
+  async function cancelWaiting(waitingEmail: string) {
+    setError(null)
+    const { error: rpcError } = await supabase.rpc('remove_pending_member', {
+      p_opportunity_id: opp.id,
+      p_email: waitingEmail,
+    })
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    await onChanged()
+  }
+
+  async function confirmList() {
+    setChecking(true)
+    setError(null)
+    const { error: rpcError } = await supabase.rpc('confirm_roster', { p_opportunity_id: opp.id })
+    setChecking(false)
+    if (rpcError) {
+      setError(friendlyError(rpcError))
+      return
+    }
+    await onChanged()
+  }
+
+  const checkDue =
+    !lastCheck || Date.now() - Date.parse(lastCheck.checked_at) > CHECK_DUE_DAYS * 86_400_000
+  const checkedBy = lastCheck?.checked_by ? people.get(lastCheck.checked_by) : undefined
 
   const name = (p: Profile) => (
     <span className="lead-name">
@@ -175,10 +227,15 @@ export default function LeadPeople({
 
       <div className="people-group">
         <h4>
-          Confirmed <span className="count">{confirmed.length}</span>
-          {opp.capacity ? <span className="small muted"> of {opp.capacity} seats</span> : null}
+          Member list <span className="count">{confirmed.length + pending.length}</span>
+          {opp.capacity ? (
+            <span className="small muted">
+              {' '}
+              {confirmed.length + pending.length} of {opp.capacity} seats
+            </span>
+          ) : null}
         </h4>
-        {confirmed.length === 0 ? (
+        {confirmed.length === 0 && pending.length === 0 ? (
           <p className="small muted">No one yet.</p>
         ) : (
           <ul className="lead-rows">
@@ -188,20 +245,50 @@ export default function LeadPeople({
                 {statusOf(signup) === 'committed' && (
                   <span className="lead-actions">
                     <ConfirmAction
-                      label="Undo"
-                      className="btn btn-link small"
-                      ariaLabel={`Undo confirming ${displayName(person)}`}
-                      question={`Move ${displayName(person)} back to waiting?`}
-                      confirmLabel="Yes, move back"
+                      label="Remove"
+                      className="btn btn-link danger small"
+                      ariaLabel={`Remove ${displayName(person)} from the member list`}
+                      question={`Take ${displayName(person)} off the member list?`}
+                      detail="They are recorded as having left today. You can add them back any time."
+                      confirmLabel="Yes, remove"
                       disabled={saving === signup.id}
-                      onConfirm={() => decide(signup, 'undo')}
+                      onConfirm={() => decide(signup, 'remove')}
                     />
                   </span>
                 )}
               </li>
             ))}
+            {pending.map((w) => (
+              <li key={w.email}>
+                <span className="lead-name muted">
+                  {w.email} <span className="small">· waiting to sign in</span>
+                </span>
+                <span className="lead-actions">
+                  <ConfirmAction
+                    label="Cancel"
+                    className="btn btn-link danger small"
+                    ariaLabel={`Cancel adding ${w.email}`}
+                    question={`Cancel adding ${w.email}?`}
+                    detail="They will not be added when they sign in."
+                    confirmLabel="Yes, cancel"
+                    cancelLabel="Keep"
+                    onConfirm={() => cancelWaiting(w.email)}
+                  />
+                </span>
+              </li>
+            ))}
           </ul>
         )}
+        <div className={`list-check ${checkDue ? 'list-check-due' : ''}`}>
+          <p className="small">
+            {checkDue
+              ? 'Once a year, please check this list: remove anyone no longer active, add anyone missing, then click List is up to date.'
+              : `Member list last confirmed ${formatDate(lastCheck!.checked_at)}${checkedBy ? ` by ${displayName(checkedBy)}` : ''}.`}
+          </p>
+          <button type="button" className="btn btn-secondary btn-small" disabled={checking} onClick={() => void confirmList()}>
+            <Check size={14} aria-hidden="true" /> {checking ? 'Saving…' : 'List is up to date'}
+          </button>
+        </div>
       </div>
 
       {notNow.length > 0 && (
@@ -231,19 +318,14 @@ export default function LeadPeople({
       )}
 
       <form className="lead-add" onSubmit={addMember}>
-        <label className="field">
-          <span>Already on this? Add them by email</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@ems-wi.com"
-            autoComplete="off"
-          />
-          <small>They must have signed in to the site once. They are added as confirmed.</small>
-        </label>
+        <PersonPicker
+          label="Already on this? Add them to the member list"
+          value={email}
+          onChange={setEmail}
+          help="Type part of a name or email and pick the person, or type their full work email. If they have not signed in yet, they are added automatically the first time they sign in."
+        />
         <div>
-          <button className="btn btn-secondary btn-small" disabled={adding || !email.trim()}>
+          <button className="btn btn-secondary btn-small" disabled={adding || !email.includes('@')}>
             <UserPlus size={14} aria-hidden="true" /> {adding ? 'Adding…' : 'Add'}
           </button>
         </div>

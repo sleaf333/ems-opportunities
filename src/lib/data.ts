@@ -5,7 +5,9 @@ import type {
   Opportunity,
   OpportunityCategory,
   OpportunityOwner,
+  PendingMember,
   Profile,
+  RosterCheck,
   Signup,
   SignupCounts,
 } from './types'
@@ -57,6 +59,30 @@ export function fetchSignupsFor(opportunityId: string): Promise<Signup[]> {
   return unwrap(
     supabase.from('signups').select('*').eq('opportunity_id', opportunityId).order('status_changed_at'),
   )
+}
+
+// Member-list extras (0014): people a lead added who have not signed in yet,
+// and the latest "List is up to date" per post. The database only returns
+// rows for posts this person owns (all posts for admins). Any error, for
+// example before 0014 is run, gives empty results so pages still load.
+export interface MemberListExtras {
+  pending: PendingMember[]
+  lastCheck: Map<string, RosterCheck>
+}
+
+export async function fetchMemberListExtras(opportunityId?: string): Promise<MemberListExtras> {
+  let pendingQuery = supabase.from('pending_members').select('*').order('email')
+  let checksQuery = supabase.from('roster_checks').select('*').order('checked_at', { ascending: false }).order('id')
+  if (opportunityId) {
+    pendingQuery = pendingQuery.eq('opportunity_id', opportunityId)
+    checksQuery = checksQuery.eq('opportunity_id', opportunityId).limit(1)
+  }
+  const [pending, checks] = await Promise.all([pendingQuery, checksQuery])
+  const lastCheck = new Map<string, RosterCheck>()
+  for (const c of checks.error ? [] : (checks.data as RosterCheck[])) {
+    if (!lastCheck.has(c.opportunity_id)) lastCheck.set(c.opportunity_id, c)
+  }
+  return { pending: pending.error ? [] : (pending.data as PendingMember[]), lastCheck }
 }
 
 // All owners, or the owners of one post.
