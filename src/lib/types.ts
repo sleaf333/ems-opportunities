@@ -117,6 +117,23 @@ export interface OwnerPreset {
   created_at: string
 }
 
+// Someone a lead added to a member list before their first sign-in (0014);
+// they become a confirmed member when they first sign in.
+export interface PendingMember {
+  email: string
+  opportunity_id: string
+  added_by: string | null
+  created_at: string
+}
+
+// A lead confirming a post's member list is still accurate (once a year).
+export interface RosterCheck {
+  id: number
+  opportunity_id: string
+  checked_by: string | null
+  checked_at: string
+}
+
 // Previous values of a post's changed fields (admins only).
 export interface OpportunityChange {
   id: number

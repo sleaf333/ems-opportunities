@@ -906,11 +906,51 @@ function Members({
     )
   }
 
+  // One row per person on each post's member list (confirmed, or added and
+  // waiting to sign in): the group's record of who serves where.
+  function exportMemberLists() {
+    const sinceOf = (signupId: string) => {
+      const joined = data.events.filter((ev) => ev.signup_id === signupId && ev.to_status === 'committed')
+      return joined[joined.length - 1]
+    }
+    const rows: (string | number)[][] = []
+    for (const o of [...data.opportunities].sort((a, b) => a.title.localeCompare(b.title))) {
+      const check = data.memberLists.lastCheck.get(o.id)
+      const checked = check
+        ? `${formatDate(check.checked_at)}${check.checked_by ? ` by ${displayName(people.get(check.checked_by))}` : ''}`
+        : 'Never'
+      for (const s of data.signups.filter((x) => x.opportunity_id === o.id && x.status === 'committed')) {
+        const p = people.get(s.user_id)
+        const joined = sinceOf(s.id)
+        const addedBy = !joined?.changed_by
+          ? ''
+          : joined.changed_by === s.user_id
+            ? 'Themselves'
+            : displayName(people.get(joined.changed_by))
+        rows.push([
+          o.title, p?.full_name ?? '', p?.email ?? '', p?.position ? POSITION_LABELS[p.position] : '',
+          joined ? joined.changed_at.slice(0, 10) : s.status_changed_at.slice(0, 10), addedBy, 'Yes', checked,
+        ])
+      }
+      for (const w of data.memberLists.pending.filter((x) => x.opportunity_id === o.id)) {
+        rows.push([
+          o.title, '', w.email, '', w.created_at.slice(0, 10),
+          w.added_by ? displayName(people.get(w.added_by)) : '', 'Not signed in yet', checked,
+        ])
+      }
+    }
+    downloadCsv(
+      `member-lists-${stamp}.csv`,
+      toCsv(['Committee or post', 'Member', 'Email', 'Position', 'Member since', 'Added or confirmed by', 'Signed in', 'List last confirmed'], rows),
+    )
+  }
+
   return (
     <section id="members" className="card stack">
       <div className="row between wrap gap-sm">
         <h2>Members and engagement</h2>
         <div className="row wrap gap-sm">
+          <button className="btn btn-secondary" onClick={exportMemberLists}>Export member lists</button>
           <button className="btn btn-secondary" onClick={exportMembers}>Export members</button>
           <button className="btn btn-secondary" onClick={exportOpportunities}>Export opportunities</button>
           <button className="btn btn-secondary" onClick={exportSignups}>Export sign-ups</button>

@@ -26,12 +26,14 @@ import CountUp from '../components/CountUp'
 import Description from '../components/Description'
 import EmailPeople from '../components/EmailPeople'
 import LeadPeople from '../components/LeadPeople'
+import PersonPicker from '../components/PersonPicker'
 import LoadError from '../components/LoadError'
 import {
   byId,
   categoriesByOpportunity,
   fetchCategories,
   fetchCounts,
+  fetchMemberListExtras,
   fetchOpportunity,
   fetchOpportunityCategories,
   fetchOwners,
@@ -91,7 +93,8 @@ export default function OpportunityDetail() {
     // get rows back; any error (for example before 0013 is run) shows none.
     const waiting = await supabase.from('owner_presets').select('*').eq('opportunity_id', id).order('email')
     const pending = waiting.error ? [] : (waiting.data as OwnerPreset[])
-    return [opp, signups, profiles, counts.get(id), topics, owners, history, pending] as const
+    const extras = await fetchMemberListExtras(id)
+    return [opp, signups, profiles, counts.get(id), topics, owners, history, pending, extras] as const
   }, [id, profile.role])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -116,7 +119,7 @@ export default function OpportunityDetail() {
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
-  const [opp, signups, profiles, counts, topics, owners, history, pending] = data
+  const [opp, signups, profiles, counts, topics, owners, history, pending, extras] = data
   if (!opp) {
     return (
       <div className="card">
@@ -363,7 +366,14 @@ export default function OpportunityDetail() {
             <h2 className="panel-title">Who's in</h2>
             {manages ? (
               <>
-                <LeadPeople opp={opp} signups={signups} people={people} onChanged={reload} />
+                <LeadPeople
+                  opp={opp}
+                  signups={signups}
+                  people={people}
+                  pending={extras.pending}
+                  lastCheck={extras.lastCheck.get(opp.id) ?? null}
+                  onChanged={reload}
+                />
                 <PeopleList title="Withdrawn" rows={group(['withdrawn', 'no_show'])} people={people} linked />
                 <EmailPeople
                   subject={opp.title}
@@ -647,17 +657,8 @@ function OwnersPanel({
         </div>
       )}
       <form className="stack-sm" onSubmit={(e) => void add(e)}>
-        <label className="field">
-          <span>Add a co-owner by work email</span>
-          <input
-            type="email"
-            required
-            placeholder="name@ems-wi.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <button className="btn btn-secondary" disabled={busy}>
+        <PersonPicker label="Add a co-owner" value={email} onChange={setEmail} />
+        <button className="btn btn-secondary" disabled={busy || !email.includes('@')}>
           <UserPlus size={15} aria-hidden="true" /> Add co-owner
         </button>
       </form>

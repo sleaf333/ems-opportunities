@@ -1890,6 +1890,65 @@ tr.expanded td {
   border-top: 1px solid var(--hairline);
 }
 
+/* Type a name, pick a person (PersonPicker) */
+.person-picker {
+  position: relative;
+}
+.person-picker-label {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.person-suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+  max-height: 18rem;
+  overflow-y: auto;
+}
+.person-suggestions li {
+  padding: 0.35rem 0.5rem;
+}
+.person-suggestions button {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  margin: -0.35rem -0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.person-suggestions button:hover,
+.person-suggestions button:focus-visible {
+  background: var(--brand-soft);
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.list-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.list-check p {
+  margin: 0;
+  flex: 1 1 16rem;
+}
+.list-check-due {
+  background: var(--warning-soft);
+}
+
 /* Admin: long lists that scroll inside their own box */
 .scroll-list {
   max-height: 24rem;

@@ -641,7 +641,7 @@ set request.jwt.claim.sub = :'admin';
 set role authenticated;
 select tests.eq(
   (select string_agg(k, ',' order by k) from jsonb_object_keys(public.admin_export_all()) k),
-  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,notification_log,notification_settings,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,owner_presets,post_requests,profiles,role_changes,schema_version,signup_events,signups',
+  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,notification_log,notification_settings,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,owner_presets,pending_members,post_requests,profiles,role_changes,roster_checks,schema_version,signup_events,signups',
   'backup has every table');
 select tests.eq(
   (select jsonb_array_length(public.admin_export_all() -> 'signup_events')::text),
@@ -651,7 +651,7 @@ reset role;
 -- If this fails, a new table was added: put it in admin_export_all.
 select tests.eq(
   (select count(*)::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'),
-  '18', 'backup covers every table in the database');
+  '20', 'backup covers every table in the database');
 
 -- Deleting people or posts with activity is blocked (as the Supabase dashboard would).
 select tests.expect_error(format($$delete from auth.users where id = %L$$, :'doc'), '%violates foreign key constraint%');
@@ -932,8 +932,8 @@ update public.profiles set email_opt_in = false where id in (:'mem1', :'mem2');
 select public.run_daily_notifications(:'digest_at');
 select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '1', 'owner gets a digest on their day');
 select tests.eq((select details ->> 'people' from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '3', 'digest lists people not yet contacted (opted-out members too)');
-select tests.eq((select body ->> 'subject' from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com'), 'EMS Opportunities: 3 people waiting to hear from you', 'digest subject');
-select body ->> 'htmlContent' as digest_html from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' \gset
+select tests.eq((select body ->> 'subject' from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' and body ->> 'subject' like '%waiting to hear%'), 'EMS Opportunities: 3 people waiting to hear from you', 'digest subject');
+select body ->> 'htmlContent' as digest_html from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' and body ->> 'subject' like '%waiting to hear%' \gset
 select tests.eq((position('Mia &lt;One&gt;' in :'digest_html') > 0)::text, 'true', 'names are escaped');
 select tests.eq((position('Max Two' in :'digest_html') > 0)::text, 'false', 'contacted people are left out');
 select tests.eq((position('(new)' in :'digest_html') > 0)::text, 'true', 'first digest marks people new');
@@ -944,7 +944,7 @@ select public.run_daily_notifications((:'digest_at')::timestamptz + interval '1 
 select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '1', 'no repeat digest within the cycle');
 select public.run_daily_notifications((:'digest_at')::timestamptz + interval '14 days');
 select tests.eq((select count(*)::text from public.notification_log where kind = 'owner_digest' and user_id = :'own1'), '2', 'next digest two weeks later');
-select tests.eq((select (position('(new)' in body ->> 'htmlContent') > 0)::text from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' order by id desc limit 1), 'false', 'nobody new since the last digest');
+select tests.eq((select (position('(new)' in body ->> 'htmlContent') > 0)::text from net.sent where body #>> '{to,0,email}' = 'owner.one@ems-wi.com' and body ->> 'subject' like '%waiting to hear%' order by id desc limit 1), 'false', 'nobody new since the last digest');
 update public.profiles set email_opt_in = false where id = :'own1';
 select public.run_daily_notifications((:'digest_at')::timestamptz + interval '28 days');
 update public.profiles set email_opt_in = true where id = :'own1';
@@ -1043,7 +1043,7 @@ set request.jwt.claim.sub = :'lead';
 set role authenticated;
 select tests.eq(public.owner_add_member(:'prc_id', ' Rory.Roster@ems-wi.com '), 'added', 'lead adds a current member by email');
 select tests.eq(public.owner_add_member(:'prc_id', 'rory.roster@ems-wi.com'), 'already', 'adding twice is harmless');
-select tests.expect_error(format($$select public.owner_add_member(%L, 'never.signed@ems-wi.com')$$, :'prc_id'), 'This person has not signed in yet%');
+select tests.expect_error(format($$select public.owner_add_member(%L, 'someone@gmail.com')$$, :'prc_id'), 'Email must end in @ems-wi.com%');
 select public.owner_decide_signup(:'hand2_prc', 'not_selected');
 select tests.eq(public.owner_decide_signup(:'hand1_prc', 'confirm')::text, 'committed', 'lead confirms a raised hand');
 select tests.expect_error(format($$select public.owner_add_member(%L, 'poster@ems-wi.com')$$, :'prc_id'), 'All 2 seats are filled%');
@@ -1145,5 +1145,162 @@ select public.add_opportunity_owner(:'wait_opp', 'later.lead@ems-wi.com');
 reset role;
 select tests.eq(left(public.erase_opportunity_permanently(:'wait_opp'), 8), 'Erased "', 'erase a post with a waiting owner');
 select tests.eq((select count(*)::text from public.owner_presets), '0', 'waiting owners erased with the post');
+
+-- ---------------------------------------------------------------------------
+-- Committee member lists (0014)
+-- ---------------------------------------------------------------------------
+
+\set ml_lead 'a0000000-0000-0000-0000-000000000051'
+\set ml_mem 'a0000000-0000-0000-0000-000000000052'
+\set ml_other 'a0000000-0000-0000-0000-000000000053'
+\set ml_lead2 'a0000000-0000-0000-0000-000000000054'
+\set ml_lead3 'a0000000-0000-0000-0000-000000000055'
+insert into auth.users (id, email) values
+  (:'ml_lead', 'lena.list@ems-wi.com'), (:'ml_mem', 'milo.member@ems-wi.com'), (:'ml_other', 'otto.other@ems-wi.com'),
+  (:'ml_lead2', 'lou.optout@ems-wi.com'), (:'ml_lead3', 'cap.lead@ems-wi.com');
+update public.profiles set full_name = 'Lena List', position = 'partner', role = 'poster' where id = :'ml_lead';
+update public.profiles set full_name = 'Milo Member', position = 'employed_physician' where id = :'ml_mem';
+update public.profiles set full_name = 'Otto Other', position = 'employed_physician' where id = :'ml_other';
+update public.profiles set full_name = 'Lou Optout', position = 'partner', email_opt_in = false where id = :'ml_lead2';
+update public.profiles set full_name = 'Cap Lead', position = 'partner' where id = :'ml_lead3';
+insert into public.opportunities (title, region, capacity, created_by) values ('Member list post', 'group_wide', 3, :'ml_lead');
+insert into public.opportunities (title, region, created_by) values ('Opted out lead post', 'group_wide', :'ml_lead2');
+insert into public.opportunities (title, region, created_by) values ('Cap lead post', 'group_wide', :'ml_lead3');
+select id as ml_post from public.opportunities where title = 'Member list post' \gset
+insert into public.member_presets (email, position) values ('zora.zebra@ems-wi.com', 'partner');
+insert into public.member_presets (email) select 'limit.test' || g || '@ems-wi.com' from generate_series(1, 12) g;
+
+-- Finding people: post owners and admins only.
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select tests.expect_error($$select * from public.find_people('zebra')$$, 'Only post owners and admins can search%');
+reset role;
+set role anon;
+select tests.expect_error($$select * from public.find_people('zebra')$$, 'permission denied%');
+reset role;
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.eq((select email || ',' || signed_in from public.find_people('Zebra')), 'zora.zebra@ems-wi.com,false', 'finds someone from the loaded lists by email');
+select tests.eq((select email || ',' || full_name || ',' || signed_in from public.find_people('milo m')), 'milo.member@ems-wi.com,Milo Member,true', 'finds a signed-in person by name');
+select tests.eq((select count(*)::text from public.find_people('z')), '0', 'needs at least 2 letters');
+select tests.eq((select count(*)::text from public.find_people('%%')), '0', 'wildcards are taken literally');
+select tests.eq((select count(*)::text from public.find_people('limit.test')), '8', 'at most 8 suggestions');
+reset role;
+
+-- Adding members who have not signed in yet; seats count them.
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.eq(public.owner_add_member(:'ml_post', 'Zora.Zebra@ems-wi.com'), 'pending', 'lead adds someone not signed in yet');
+select tests.eq(public.owner_add_member(:'ml_post', 'zora.zebra@ems-wi.com'), 'already_pending', 'adding them twice is harmless');
+select tests.expect_error(format($$select public.owner_add_member(%L, 'x@gmail.com')$$, :'ml_post'), 'Email must end in @ems-wi.com%');
+select public.owner_add_member(:'ml_post', 'pend.two@ems-wi.com');
+select tests.eq(public.owner_add_member(:'ml_post', 'milo.member@ems-wi.com'), 'added', 'lead adds a signed-in member');
+select tests.expect_error(format($$select public.owner_add_member(%L, 'pend.three@ems-wi.com')$$, :'ml_post'), 'All 3 seats are filled%');
+select tests.eq((select count(*)::text from public.pending_members where opportunity_id = :'ml_post'), '2', 'lead sees who is waiting');
+select public.remove_pending_member(:'ml_post', 'Pend.Two@ems-wi.com');
+select tests.eq((select count(*)::text from public.pending_members where opportunity_id = :'ml_post'), '1', 'lead cancels a waiting member');
+reset role;
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select tests.eq((select count(*)::text from public.pending_members), '0', 'others cannot see waiting members');
+select tests.expect_error(format($$select public.remove_pending_member(%L, 'zora.zebra@ems-wi.com')$$, :'ml_post'), 'Only the post''s owners or an admin%');
+select tests.expect_error($$insert into public.pending_members (email, opportunity_id) values ('x@ems-wi.com', gen_random_uuid())$$, 'permission denied%');
+reset role;
+set role anon;
+select tests.expect_error(format($$select public.remove_pending_member(%L, 'zora.zebra@ems-wi.com')$$, :'ml_post'), 'permission denied%');
+reset role;
+
+-- First sign-in: a confirmed member, dated from when the lead added them.
+select created_at::text as zora_added from public.pending_members where email = 'zora.zebra@ems-wi.com' \gset
+insert into auth.users (id, email) values ('a0000000-0000-0000-0000-000000000056', 'zora.zebra@ems-wi.com');
+select tests.eq((select status::text from public.signups where user_id = 'a0000000-0000-0000-0000-000000000056' and opportunity_id = :'ml_post'), 'committed', 'joins the member list at first sign-in');
+select tests.eq((select count(*)::text from public.pending_members), '0', 'waiting entry cleared');
+select tests.eq((select changed_by::text || ',' || changed_at::text from public.signup_events where user_id = 'a0000000-0000-0000-0000-000000000056'),
+  :'ml_lead' || ',' || :'zora_added', 'history shows who added them and when');
+select tests.eq((select position::text from public.profiles where email = 'zora.zebra@ems-wi.com'), 'partner', 'preset position still applied');
+
+-- Remove: owners and admins take a confirmed member off the list.
+select id as milo_signup from public.signups where user_id = :'ml_mem' and opportunity_id = :'ml_post' \gset
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'remove')$$, :'milo_signup'), 'Only the post''s owners or an admin%');
+reset role;
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.eq(public.owner_decide_signup(:'milo_signup', 'remove')::text, 'withdrawn', 'lead removes a member');
+select tests.eq(public.owner_decide_signup(:'milo_signup', 'remove')::text, 'withdrawn', 'removing twice is harmless');
+reset role;
+select tests.eq((select changed_by::text from public.signup_events where signup_id = :'milo_signup' order by id desc limit 1), :'ml_lead', 'removal logged with the lead');
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select public.set_my_signup(:'ml_post', 'interested');
+reset role;
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.expect_error(format($$select public.owner_decide_signup(%L, 'remove')$$, :'milo_signup'), 'This person is not on the member list%');
+reset role;
+
+-- "List is up to date": owners and admins; only they see the record.
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select tests.expect_error(format($$select public.confirm_roster(%L)$$, :'ml_post'), 'Only the post''s owners or an admin%');
+select tests.expect_error($$insert into public.roster_checks (opportunity_id) values (gen_random_uuid())$$, 'permission denied%');
+reset role;
+set role anon;
+select tests.expect_error(format($$select public.confirm_roster(%L)$$, :'ml_post'), 'permission denied%');
+reset role;
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.eq((public.confirm_roster(:'ml_post') is not null)::text, 'true', 'lead confirms the list');
+reset role;
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.confirm_roster(:'ml_post');
+reset role;
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.eq((select count(*)::text from public.roster_checks where opportunity_id = :'ml_post'), '2', 'every check is kept');
+reset role;
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select tests.eq((select count(*)::text from public.roster_checks), '0', 'others cannot see list checks');
+reset role;
+
+-- Yearly reminder email in November, on each lead's own day, once.
+update public.notification_settings set enabled = true, daily_cap = 150 where id;
+select (date '2026-11-01' + mod(s.slot - mod(date '2026-11-01' - date '2026-01-05', 14) + 28, 14))::text as nov_day
+from (select mod(('x' || substr(md5(:'ml_lead'), 1, 7))::bit(28)::integer, 14) as slot) s \gset
+select public.run_daily_notifications((:'nov_day' || ' 08:00 America/Chicago')::timestamptz);
+select tests.eq((select count(*)::text from public.notification_log where kind = 'roster_check' and user_id = :'ml_lead'), '0', 'no reminder when the list was confirmed this year');
+update public.roster_checks set checked_at = now() - interval '400 days' where opportunity_id = :'ml_post';
+select public.run_daily_notifications(((:'nov_day')::date - 14 || ' 08:00 America/Chicago')::timestamptz);
+select tests.eq((select count(*)::text from public.notification_log where kind = 'roster_check' and user_id = :'ml_lead'), '0', 'no reminder outside November');
+select count(*) as sent_before from net.sent \gset
+select public.run_daily_notifications((:'nov_day' || ' 08:00 America/Chicago')::timestamptz);
+select tests.eq((select count(*)::text from public.notification_log where kind = 'roster_check' and user_id = :'ml_lead'), '1', 'reminder on the lead''s November day when the list is a year old');
+select tests.eq((select (body ->> 'subject') || ',' || (position('Member list post' in body ->> 'htmlContent') > 0)::text from net.sent
+  where id > :sent_before and body #>> '{to,0,email}' = 'lena.list@ems-wi.com'), 'EMS Opportunities: once-a-year check of your member list,true', 'reminder lists the post');
+select public.run_daily_notifications(((:'nov_day')::date + 14 || ' 08:00 America/Chicago')::timestamptz);
+select tests.eq((select count(*)::text from public.notification_log where kind = 'roster_check' and user_id = :'ml_lead'), '1', 'only one reminder a year');
+
+-- Opted out: no reminder. Over the daily limit: waits.
+select (date '2026-11-01' + mod(s.slot - mod(date '2026-11-01' - date '2026-01-05', 14) + 28, 14))::text as nov_day2
+from (select mod(('x' || substr(md5(:'ml_lead2'), 1, 7))::bit(28)::integer, 14) as slot) s \gset
+select public.run_daily_notifications((:'nov_day2' || ' 08:00 America/Chicago')::timestamptz);
+select tests.eq((select count(*)::text from public.notification_log where kind = 'roster_check' and user_id = :'ml_lead2'), '0', 'no reminder for someone who turned emails off');
+select (date '2026-11-01' + mod(s.slot - mod(date '2026-11-01' - date '2026-01-05', 14) + 28, 14))::text as nov_day3
+from (select mod(('x' || substr(md5(:'ml_lead3'), 1, 7))::bit(28)::integer, 14) as slot) s \gset
+update public.notification_settings set daily_cap = 0 where id;
+select tests.eq(((public.run_daily_notifications((:'nov_day3' || ' 08:00 America/Chicago')::timestamptz) ->> 'skipped_for_limit')::integer >= 1)::text, 'true', 'over the daily limit the reminder waits');
+select tests.eq((select count(*)::text from public.notification_log where kind = 'roster_check' and user_id = :'ml_lead3'), '0', 'no reminder sent over the limit');
+update public.notification_settings set daily_cap = 150, enabled = false where id;
+
+-- Erasing a post clears its waiting members and list checks.
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select public.owner_add_member(:'ml_post', 'later.member@ems-wi.com');
+reset role;
+select tests.eq(left(public.erase_opportunity_permanently(:'ml_post'), 8), 'Erased "', 'erase a post with a member list');
+select tests.eq((select count(*)::text from public.pending_members) || ',' || (select count(*)::text from public.roster_checks where opportunity_id = :'ml_post'), '0,0', 'waiting members and checks erased with the post');
 
 \o

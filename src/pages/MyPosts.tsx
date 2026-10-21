@@ -5,7 +5,7 @@ import { useProfile } from '../auth/AuthContext'
 import EmailPeople, { type EmailGroup } from '../components/EmailPeople'
 import LeadPeople from '../components/LeadPeople'
 import LoadError from '../components/LoadError'
-import { byId, fetchOpportunities, fetchOwners, fetchProfiles, fetchSignups, useLoader } from '../lib/data'
+import { byId, fetchMemberListExtras, fetchOpportunities, fetchOwners, fetchProfiles, fetchSignups, useLoader } from '../lib/data'
 import {
   displayName,
   eligibilityGroup,
@@ -15,7 +15,7 @@ import {
   STATUS_LABELS,
   TYPE_LABELS,
 } from '../lib/format'
-import type { Opportunity, OpportunityOwner, Profile, Signup } from '../lib/types'
+import type { Opportunity, OpportunityOwner, PendingMember, Profile, RosterCheck, Signup } from '../lib/types'
 
 // Posts the signed-in person owns (created, or added as an owner by an admin),
 // with who signed up and quick ways to email them. Row-level security already
@@ -23,7 +23,7 @@ import type { Opportunity, OpportunityOwner, Profile, Signup } from '../lib/type
 export default function MyPosts() {
   const profile = useProfile()
   const { data, error, loading, reload } = useLoader(
-    () => Promise.all([fetchOpportunities(), fetchOwners(), fetchSignups(), fetchProfiles()]),
+    () => Promise.all([fetchOpportunities(), fetchOwners(), fetchSignups(), fetchProfiles(), fetchMemberListExtras()]),
     [],
   )
 
@@ -31,7 +31,7 @@ export default function MyPosts() {
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
-  const [opps, owners, signups, profiles] = data
+  const [opps, owners, signups, profiles, extras] = data
   const people = byId(profiles)
   const mineIds = new Set(owners.filter((o) => o.user_id === profile.id).map((o) => o.opportunity_id))
   const mine = opps
@@ -48,6 +48,8 @@ export default function MyPosts() {
       owners={owners.filter((o) => o.opportunity_id === opp.id)}
       signups={signups.filter((s) => s.opportunity_id === opp.id)}
       people={people}
+      pending={extras.pending.filter((w) => w.opportunity_id === opp.id)}
+      lastCheck={extras.lastCheck.get(opp.id) ?? null}
       me={profile.id}
       canEdit
       onChanged={reload}
@@ -99,6 +101,8 @@ function MyPost({
   owners,
   signups,
   people,
+  pending,
+  lastCheck,
   me,
   canEdit,
   onChanged,
@@ -107,6 +111,8 @@ function MyPost({
   owners: OpportunityOwner[]
   signups: Signup[]
   people: Map<string, Profile>
+  pending: PendingMember[]
+  lastCheck: RosterCheck | null
   me: string
   canEdit: boolean
   onChanged: () => Promise<void>
@@ -168,7 +174,16 @@ function MyPost({
         <EmailPeople subject={opp.title} groups={groups} />
       </div>
 
-      {open && <LeadPeople opp={opp} signups={signups} people={people} onChanged={onChanged} />}
+      {open && (
+        <LeadPeople
+          opp={opp}
+          signups={signups}
+          people={people}
+          pending={pending}
+          lastCheck={lastCheck}
+          onChanged={onChanged}
+        />
+      )}
     </article>
   )
 }
