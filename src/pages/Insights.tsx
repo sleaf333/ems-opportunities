@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { useProfile } from '../auth/AuthContext'
 import AdminTabs from '../components/AdminTabs'
 import LoadError from '../components/LoadError'
+import CommitteeHealth from '../components/insights/CommitteeHealth'
 import Funnel from '../components/insights/Funnel'
 import Gaps from '../components/insights/Gaps'
 import Heatmap from '../components/insights/Heatmap'
@@ -12,6 +13,7 @@ import { loadAdminData } from '../lib/adminData'
 import { useLoader } from '../lib/data'
 import { POSITION_LABELS, REGION_LABELS } from '../lib/format'
 import {
+  committeeHealth,
   funnel,
   gaps,
   HEATMAP_POSITIONS,
@@ -50,6 +52,7 @@ export default function Insights() {
       byLocation: heatmapByLocation(data, range, filter, today),
       byPosition: heatmapByPosition(data, filter),
       gaps: gaps(data, today),
+      committees: committeeHealth(data, filter, today),
     }
   }, [data, range, filter, today])
 
@@ -110,6 +113,20 @@ export default function Insights() {
               <span>rising stars</span>
             </div>
           </div>
+
+          <section className="card stack">
+            <div>
+              <h2>Committees at a glance</h2>
+              <p className="small muted">
+                As of today (the time range does not apply). Member counts follow the position filter
+                {filter === 'all' ? '' : `: ${POSITION_FILTERS.find((f) => f.key === filter)?.label}`}.
+              </p>
+            </div>
+            <CommitteeHealth
+              rows={computed.committees}
+              memberWord={filter === 'all' ? 'Members' : 'Members in filter'}
+            />
+          </section>
 
           <div className="insights-grid">
             <section className="card stack">

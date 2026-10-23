@@ -2340,3 +2340,21 @@ tr.expanded td {
     border: 1px solid #ccc;
   }
 }
+
+/* Committees at a glance (Insights) */
+.committee-health td.num,
+.committee-health th.num {
+  text-align: right;
+}
+.health-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.tag-warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.committee-health td.num .small {
+  white-space: nowrap;
+}

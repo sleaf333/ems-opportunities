@@ -24,6 +24,12 @@ export const RISING_MIN_SCORE = 3
 export const RISING_LIMIT = 10
 // Open posts older than this with no commitments are "quiet".
 export const QUIET_POST_DAYS = 30
+// Committees at a glance: someone waiting longer than this is flagged,
+// lists unconfirmed this long are due (matches the lead's yearly note), and
+// suggestions are counted over this window.
+export const WAITING_TOO_LONG_DAYS = 14
+export const LIST_CHECK_DUE_DAYS = 335
+export const SUGGESTION_WINDOW_DAYS = 90
 
 const DAY = 86_400_000
 const ACTIVE: SignupStatus[] = ['interested', 'committed', 'waitlisted', 'completed']
@@ -392,3 +398,82 @@ export function gaps(data: AdminData, today: Date): Gaps {
 
   return { wanted, quiet, emptyRegions }
 }
+
+// ---------------------------------------------------------------------------
+// Committees at a glance
+// ---------------------------------------------------------------------------
+
+export type HealthFlag = 'no_lead' | 'no_members' | 'waiting_long' | 'list_due' | 'full'
+
+export interface CommitteeHealth {
+  opportunity: Opportunity
+  leads: Profile[]
+  members: number // confirmed, in the position filter
+  waitingToSignIn: number // added by the lead, not signed in yet (shown for Everyone only)
+  capacity: number | null
+  seatsTaken: number // confirmed + waiting to sign in, all positions (what seats count)
+  waitingForDecision: number
+  oldestWaitDays: number | null
+  suggestions: number // in the last SUGGESTION_WINDOW_DAYS
+  lastCheck: string | null
+  flags: HealthFlag[]
+}
+
+// One row per committee or leadership post that is not a draft or archived:
+// who leads it, how many members, who is waiting, and when the list was last
+// confirmed. Rows needing attention come first.
+export function committeeHealth(data: AdminData, filter: PositionFilter, today: Date): CommitteeHealth[] {
+  const people = new Map(data.profiles.map((p) => [p.id, p]))
+  const inFilter = new Set(peopleIn(data.profiles, filter).map((p) => p.id))
+  const suggestionsSince = today.getTime() - SUGGESTION_WINDOW_DAYS * DAY
+
+  const rows = data.opportunities
+    .filter((o) => (o.type === 'committee' || o.type === 'leadership') && (o.status === 'open' || o.status === 'closed'))
+    .map((o): CommitteeHealth => {
+      const rows = data.signups.filter((s) => s.opportunity_id === o.id)
+      const confirmed = rows.filter((s) => s.status === 'committed' || s.status === 'completed')
+      const waiting = rows.filter((s) => s.status === 'interested')
+      const pending = data.memberLists.pending.filter((w) => w.opportunity_id === o.id).length
+      const owned = data.owners.filter((ow) => ow.opportunity_id === o.id)
+      const leads = owned
+        .map((ow) => people.get(ow.user_id))
+        .filter((p): p is Profile => Boolean(p))
+      const oldest = waiting.reduce<number | null>((min, s) => {
+        const t = time(s.status_changed_at)
+        return min === null || t < min ? t : min
+      }, null)
+      const oldestWaitDays = oldest === null ? null : Math.floor((today.getTime() - oldest) / DAY)
+      const check = data.memberLists.lastCheck.get(o.id)?.checked_at ?? null
+      const seatsTaken = rows.filter((s) => s.status === 'committed').length + pending
+      const members = confirmed.filter((s) => inFilter.has(s.user_id)).length
+
+      const flags: HealthFlag[] = []
+      if (leads.length === 0) flags.push('no_lead')
+      if (confirmed.length + pending === 0) flags.push('no_members')
+      if (oldestWaitDays !== null && oldestWaitDays > WAITING_TOO_LONG_DAYS) flags.push('waiting_long')
+      // Due a year after the last check; never checked, a year after the
+      // first current lead was added (so new leads are not flagged at once).
+      const since = check ?? owned.reduce<string | null>((min, ow) => (min === null || ow.added_at < min ? ow.added_at : min), null)
+      if (since && today.getTime() - time(since) > LIST_CHECK_DUE_DAYS * DAY) flags.push('list_due')
+      if (o.capacity && seatsTaken >= o.capacity) flags.push('full')
+
+      return {
+        opportunity: o,
+        leads,
+        members,
+        waitingToSignIn: filter === 'all' ? pending : 0,
+        capacity: o.capacity,
+        seatsTaken,
+        waitingForDecision: waiting.length,
+        oldestWaitDays,
+        suggestions: data.memberLists.suggestions.filter((x) => x.opportunity_id === o.id && time(x.created_at) >= suggestionsSince).length,
+        lastCheck: check,
+        flags,
+      }
+    })
+
+  // Needs attention first ("full" is information, not a problem).
+  const attention = (r: CommitteeHealth) => r.flags.filter((f) => f !== 'full').length
+  return rows.sort((a, b) => attention(b) - attention(a) || a.opportunity.title.localeCompare(b.opportunity.title))
+}
+
