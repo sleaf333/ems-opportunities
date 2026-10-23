@@ -15,7 +15,7 @@ import {
   STATUS_LABELS,
   TYPE_LABELS,
 } from '../lib/format'
-import type { Opportunity, OpportunityOwner, PendingMember, Profile, RosterCheck, Signup } from '../lib/types'
+import type { Opportunity, OpportunityOwner, PendingMember, Profile, RosterCheck, Signup, Suggestion } from '../lib/types'
 
 // Posts the signed-in person owns (created, or added as an owner by an admin),
 // with who signed up and quick ways to email them. Row-level security already
@@ -50,6 +50,7 @@ export default function MyPosts() {
       people={people}
       pending={extras.pending.filter((w) => w.opportunity_id === opp.id)}
       lastCheck={extras.lastCheck.get(opp.id) ?? null}
+      suggestions={extras.suggestions.filter((x) => x.opportunity_id === opp.id)}
       me={profile.id}
       canEdit
       onChanged={reload}
@@ -103,6 +104,7 @@ function MyPost({
   people,
   pending,
   lastCheck,
+  suggestions,
   me,
   canEdit,
   onChanged,
@@ -113,6 +115,7 @@ function MyPost({
   people: Map<string, Profile>
   pending: PendingMember[]
   lastCheck: RosterCheck | null
+  suggestions: Suggestion[]
   me: string
   canEdit: boolean
   onChanged: () => Promise<void>
@@ -181,6 +184,7 @@ function MyPost({
           people={people}
           pending={pending}
           lastCheck={lastCheck}
+          suggestions={suggestions}
           onChanged={onChanged}
         />
       )}

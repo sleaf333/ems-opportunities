@@ -102,7 +102,7 @@ function makeData(parts: Partial<AdminData>): AdminData {
     recentRoleChanges: [],
     lastBackup: null,
     postRequests: [],
-    memberLists: { pending: [], lastCheck: new Map() },
+    memberLists: { pending: [], lastCheck: new Map(), suggestions: [] },
     ...parts,
   }
 }

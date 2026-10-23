@@ -144,6 +144,7 @@ export default function Profile() {
             If you raise your hand and no one reaches out within three weeks: one follow-up with who to
             contact.
           </li>
+          <li>If a colleague suggests you for a post: one email saying who suggested you.</li>
         </ul>
         <p className="small muted">Sign-in codes are always sent; this setting does not affect them.</p>
       </section>

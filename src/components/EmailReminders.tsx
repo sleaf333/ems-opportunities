@@ -8,7 +8,7 @@ import { friendlyError, supabase } from '../lib/supabase'
 // What admin_notification_status() returns (0011).
 interface LogRow {
   id: number
-  kind: 'owner_digest' | 'member_nudge' | 'test' | 'setting' | 'roster_check'
+  kind: 'owner_digest' | 'member_nudge' | 'test' | 'setting' | 'roster_check' | 'suggestion'
   status: 'queued' | 'sent' | 'failed' | 'unknown' | 'done'
   status_code: number | null
   error: string | null
@@ -20,6 +20,9 @@ interface LogRow {
 
 interface EmailStatus {
   enabled: boolean
+  // 0015: "Suggest someone" emails have their own switch (absent before 0015).
+  suggestions_enabled?: boolean
+  suggestions_14d?: number
   ready: boolean
   has_key: boolean
   sender_email: string
@@ -41,6 +44,7 @@ const KIND_LABELS: Record<LogRow['kind'], string> = {
   test: 'Test email',
   setting: 'Switched',
   roster_check: 'Member list check',
+  suggestion: 'Suggestion',
 }
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -185,6 +189,41 @@ export default function EmailReminders() {
           <RefreshCw size={14} aria-hidden="true" /> Refresh
         </button>
       </div>
+      {data.suggestions_enabled !== undefined && (
+        <div className="row between wrap gap-sm suggestions-switch">
+          <p className="small">
+            <strong>Suggestions</strong>{' '}
+            <span className={`badge ${data.suggestions_enabled ? 'badge-on' : 'badge-off'}`}>
+              {data.suggestions_enabled ? 'On' : 'Off'}
+            </span>{' '}
+            <span className="muted">
+              Members can suggest a colleague for a post, and the colleague gets one email saying who suggested them.
+              These go out right away (not with the reminders) and count toward the daily limit. Last 14 days:{' '}
+              {data.suggestions_14d ?? 0}.
+            </span>
+          </p>
+          {data.suggestions_enabled ? (
+            <ConfirmAction
+              label="Turn off suggestions"
+              className="btn btn-secondary btn-small"
+              question="Stop suggestion emails?"
+              detail="The Suggest box disappears from posts until you turn it back on."
+              confirmLabel="Yes, turn off"
+              disabled={busy}
+              onConfirm={() => run(() => supabase.rpc('admin_set_suggestions', { p_on: false }), 'Suggestions are off.')}
+            />
+          ) : (
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              disabled={busy}
+              onClick={() => void run(() => supabase.rpc('admin_set_suggestions', { p_on: true }), 'Suggestions are on.')}
+            >
+              Turn on suggestions
+            </button>
+          )}
+        </div>
+      )}
       {message && <p className="notice">{message}</p>}
       {actionError && <p className="error" role="alert">{actionError}</p>}
 
@@ -216,7 +255,9 @@ export default function EmailReminders() {
                 <span className="muted small">{formatDateTime(r.created_at)}</span>{' '}
                 <strong>{KIND_LABELS[r.kind]}</strong>
                 {r.kind === 'setting'
-                  ? ` ${r.details.enabled ? 'on' : 'off'} by ${r.person ?? 'an admin'}`
+                  ? 'suggestions_enabled' in r.details
+                    ? ` suggestions ${r.details.suggestions_enabled ? 'on' : 'off'} by ${r.person ?? 'an admin'}`
+                    : ` ${r.details.enabled ? 'on' : 'off'} by ${r.person ?? 'an admin'}`
                   : ` to ${r.person ?? 'a former member'}`}
                 {r.title ? ` about "${r.title}"` : ''}
                 {r.kind === 'owner_digest' && typeof r.details.people === 'number' ? ` (${r.details.people} people)` : ''}

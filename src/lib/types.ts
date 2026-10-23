@@ -134,6 +134,17 @@ export interface RosterCheck {
   checked_at: string
 }
 
+// "Suggest someone" (0015): a member named a colleague for a post. Visible to
+// the suggester, the post's owners and admins.
+export interface Suggestion {
+  id: number
+  opportunity_id: string
+  suggested_email: string
+  suggested_by: string | null
+  note: string
+  created_at: string
+}
+
 // Previous values of a post's changed fields (admins only).
 export interface OpportunityChange {
   id: number

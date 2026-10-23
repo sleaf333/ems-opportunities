@@ -176,6 +176,13 @@ Members cannot add themselves to anything. They raise a hand (**I'm interested**
 - Site admins can download every list at once: Admin page, **Export member lists**.
 - **Seats:** if the post has a seat count, Confirm stops when it is full. People waiting to sign in count too. Raise the count with **Edit**, or remove someone first.
 - Confirmed members can **step off** themselves; the site asks them to let the lead know.
+- **Suggested by members:** anyone can suggest a colleague on a post ("Know someone who'd be a good fit?"). Leads see each suggestion under **Suggested by members** in Manage people, with the note and whether that person has since raised a hand. The suggested person decides; nothing is added to the list automatically.
+
+## Suggest someone and your service record (for everyone)
+
+- On any open post, **Know someone who'd be a good fit? Suggest them**: type part of a colleague's name, add a short note if you like, and click **Send suggestion**. They get one email saying you suggested them, with a link. It works even if they have never signed in.
+- To keep it personal: each person can be suggested for a post once a year, gets at most 3 suggestions a month, and each member can send 10 a day. People who turned emails off on their Profile are not emailed.
+- **My sign-ups** starts with **My service record**: what you lead or serve on now and since when, and what you served on before. **Print or save as PDF** makes a copy. If something is missing, ask the committee's lead.
 
 ## Automatic emails (reminders)
 
@@ -185,6 +192,7 @@ The site can send three kinds of reminder email. Nothing is sent until a site ad
 - **Members:** one follow-up, three weeks after they raise a hand, if the lead has not confirmed them, chosen Not this time, or ticked them Contacted. It lists the post's contacts (or its owners if it has none). Sign-ups older than six weeks are never followed up, so turning emails on does not flood anyone about old sign-ups.
 - **Member list check:** in November, owners whose member list has not been confirmed in the past year get one email asking them to check it and click **List is up to date**. Sent on their usual summary day, at most once a year.
 - Anyone can turn these off on their **Profile**. Sign-in codes are not affected.
+- **Suggestions** (someone suggested you for a post) are separate: they go out right away when a member clicks Send, with their own on/off on the Admin page (**Suggestions**, on by default). They count toward the same daily limit.
 - At most **150 a day** (the rest wait for the next morning), so sign-in codes always have room in Brevo's free 300.
 - A schedule inside the database runs the check every morning (about 8am in summer, 7am in winter).
 

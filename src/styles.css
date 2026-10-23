@@ -2295,3 +2295,48 @@ tr.expanded td {
   padding: 0.25rem 0.5rem;
   min-width: 9rem;
 }
+
+/* ==========================================================================
+   Suggest someone (0015) and the service record
+   ========================================================================== */
+
+.suggest summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--brand);
+}
+.suggest[open] summary {
+  margin-bottom: 0.75rem;
+}
+.suggested .lead-name {
+  min-width: 0;
+}
+.suggestion-note {
+  display: block;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.tag-lead {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.service-record h3 {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+}
+
+@media print {
+  .topbar,
+  .footer,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+}
