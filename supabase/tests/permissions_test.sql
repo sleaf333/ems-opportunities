@@ -641,7 +641,7 @@ set request.jwt.claim.sub = :'admin';
 set role authenticated;
 select tests.eq(
   (select string_agg(k, ',' order by k) from jsonb_object_keys(public.admin_export_all()) k),
-  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,notification_log,notification_settings,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,owner_presets,pending_members,post_requests,profiles,role_changes,roster_checks,schema_version,signup_events,signups',
+  'backup_log,exported_at,interest_categories,member_interest_categories,member_interests,member_presets,notification_log,notification_settings,opportunities,opportunity_categories,opportunity_history,opportunity_owners,owner_changes,owner_presets,pending_members,post_requests,profiles,role_changes,roster_checks,schema_version,signup_events,signups,suggestions',
   'backup has every table');
 select tests.eq(
   (select jsonb_array_length(public.admin_export_all() -> 'signup_events')::text),
@@ -651,7 +651,7 @@ reset role;
 -- If this fails, a new table was added: put it in admin_export_all.
 select tests.eq(
   (select count(*)::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'),
-  '20', 'backup covers every table in the database');
+  '21', 'backup covers every table in the database');
 
 -- Deleting people or posts with activity is blocked (as the Supabase dashboard would).
 select tests.expect_error(format($$delete from auth.users where id = %L$$, :'doc'), '%violates foreign key constraint%');
@@ -1170,10 +1170,10 @@ select id as ml_post from public.opportunities where title = 'Member list post' 
 insert into public.member_presets (email, position) values ('zora.zebra@ems-wi.com', 'partner');
 insert into public.member_presets (email) select 'limit.test' || g || '@ems-wi.com' from generate_series(1, 12) g;
 
--- Finding people: post owners and admins only.
+-- Finding people: any signed-in member (0015 opened it up, like the directory).
 set request.jwt.claim.sub = :'ml_other';
 set role authenticated;
-select tests.expect_error($$select * from public.find_people('zebra')$$, 'Only post owners and admins can search%');
+select tests.eq((select count(*)::text from public.find_people('zebra')), '1', 'a member who owns nothing can search people');
 reset role;
 set role anon;
 select tests.expect_error($$select * from public.find_people('zebra')$$, 'permission denied%');
@@ -1302,5 +1302,144 @@ select public.owner_add_member(:'ml_post', 'later.member@ems-wi.com');
 reset role;
 select tests.eq(left(public.erase_opportunity_permanently(:'ml_post'), 8), 'Erased "', 'erase a post with a member list');
 select tests.eq((select count(*)::text from public.pending_members) || ',' || (select count(*)::text from public.roster_checks where opportunity_id = :'ml_post'), '0,0', 'waiting members and checks erased with the post');
+
+-- ---------------------------------------------------------------------------
+-- Suggest someone (0015)
+-- ---------------------------------------------------------------------------
+
+insert into public.opportunities (title, region, created_by, description, time_estimate, eligible_positions)
+values ('Suggest post', 'group_wide', :'ml_lead', 'Plan the spring  conference.', '2 hours a month', '{partner,employed_physician}');
+insert into public.opportunities (title, region, created_by, status) values ('Closed suggest post', 'group_wide', :'ml_lead', 'closed');
+insert into public.opportunities (title, region, created_by, visible_until) values ('Expired suggest post', 'group_wide', :'ml_lead', current_date - 2);
+select id as sg_post from public.opportunities where title = 'Suggest post' \gset
+select id as sg_closed from public.opportunities where title = 'Closed suggest post' \gset
+select id as sg_expired from public.opportunities where title = 'Expired suggest post' \gset
+select id as sg_other_post from public.opportunities where title = 'Opted out lead post' \gset
+insert into public.member_presets (email, position) values ('apc.person@ems-wi.com', 'apc');
+update public.notification_settings set daily_cap = 150 where id;
+
+set role anon;
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test1@ems-wi.com')$$, :'sg_post'), 'permission denied%');
+reset role;
+
+-- A member suggests someone who has not signed in: one email with the note.
+select coalesce(max(id), 0) as sg_sent_before from net.sent \gset
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.eq(public.suggestions_available()::text, 'true', 'suggestions available once email is set up');
+select tests.eq(public.suggest_person(:'sg_post', 'Limit.Test1@ems-wi.com', 'You would be great <b>here</b>'), 'sent', 'member suggests a colleague who has not signed in');
+reset role;
+select tests.eq((select count(*)::text from net.sent where id > :sg_sent_before), '1', 'one email sent');
+select tests.eq((select (body #>> '{to,0,email}') || '|' || (body ->> 'subject') from net.sent where id > :sg_sent_before),
+  'limit.test1@ems-wi.com|Milo Member thought you''d be a good fit: Suggest post', 'email goes to them, naming who suggested');
+select tests.eq((select (position('&lt;b&gt;here' in body ->> 'htmlContent') > 0)::text || ',' || (position('/o/' || :'sg_post' in body ->> 'htmlContent') > 0)::text
+                 || ',' || (position('Plan the spring conference.' in body ->> 'htmlContent') > 0)::text
+                 || ',' || (position('Hi,' in body ->> 'htmlContent') > 0)::text
+  from net.sent where id > :sg_sent_before), 'true,true,true,true', 'email has the escaped note, the link and the description');
+select tests.eq((select kind || ',' || coalesce(user_id::text, 'none') || ',' || (details ->> 'to') from public.notification_log where id = (select log_id from public.suggestions where suggested_email = 'limit.test1@ems-wi.com')),
+  'suggestion,none,limit.test1@ems-wi.com', 'logged as a suggestion email');
+
+-- The same person for the same post: no second email.
+select coalesce(max(id), 0) as sg_sent_before from net.sent \gset
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select tests.eq(public.suggest_person(:'sg_post', 'limit.test1@ems-wi.com'), 'already_suggested', 'someone already suggested them');
+reset role;
+select tests.eq((select count(*)::text from net.sent where id > :sg_sent_before), '0', 'no second email');
+
+-- A signed-in colleague; once they raise a hand, nothing more to suggest.
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.eq(public.suggest_person(:'sg_post', 'otto.other@ems-wi.com'), 'sent', 'suggest a signed-in colleague');
+reset role;
+select tests.eq((select user_id::text from public.notification_log where kind = 'suggestion' and details ->> 'to' = 'otto.other@ems-wi.com'), :'ml_other', 'log points at their profile');
+select tests.eq((select (position('Hi Otto Other,' in body ->> 'htmlContent') > 0)::text from net.sent where body #>> '{to,0,email}' = 'otto.other@ems-wi.com' order by id desc limit 1), 'true', 'greets them by name');
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select public.set_my_signup(:'sg_post', 'interested');
+reset role;
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.eq(public.suggest_person(:'sg_post', 'otto.other@ems-wi.com'), 'already_in', 'already raised a hand');
+select tests.eq(public.suggest_person(:'sg_post', 'zora.zebra@ems-wi.com'), 'sent', 'a lead can suggest too');
+reset role;
+
+-- Refusals.
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.expect_error(format($$select public.suggest_person(%L, 'milo.member@ems-wi.com')$$, :'sg_post'), 'That is your own email%');
+select tests.expect_error(format($$select public.suggest_person(%L, 'x@gmail.com')$$, :'sg_post'), 'Email must end in @ems-wi.com%');
+select tests.expect_error(format($$select public.suggest_person(%L, 'apc.person@ems-wi.com')$$, :'sg_post'), 'This post is not open to their position%');
+select tests.expect_error(format($$select public.suggest_person(%L, 'lou.optout@ems-wi.com')$$, :'sg_post'), 'They have turned off emails%');
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test2@ems-wi.com', repeat('a', 301))$$, :'sg_post'), 'Please keep the note to 300%');
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test2@ems-wi.com')$$, :'sg_closed'), 'This post is not open, so suggestions are off%');
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test2@ems-wi.com')$$, :'sg_expired'), 'This post is not open, so suggestions are off%');
+select tests.expect_error($$insert into public.suggestions (opportunity_id, suggested_email) values (gen_random_uuid(), 'x@ems-wi.com')$$, 'permission denied%');
+reset role;
+
+-- Limits: 10 a day per sender, 3 a month per person, the daily email cap.
+insert into public.suggestions (opportunity_id, suggested_email, suggested_by)
+select :'sg_other_post', 'filler' || g || '@ems-wi.com', :'ml_mem' from generate_series(1, 8) g;
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test2@ems-wi.com')$$, :'sg_post'), 'You have sent 10 suggestions today%');
+reset role;
+delete from public.suggestions where suggested_email like 'filler%';
+insert into public.suggestions (opportunity_id, suggested_email, suggested_by)
+select id, 'limit.test3@ems-wi.com', :'ml_lead' from public.opportunities where title in ('Opted out lead post', 'Cap lead post', 'Closed suggest post');
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test3@ems-wi.com')$$, :'sg_post'), 'They have had 3 suggestions this month%');
+reset role;
+update public.notification_settings set daily_cap = 0 where id;
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test4@ems-wi.com')$$, :'sg_post'), 'The site has reached today''s email limit%');
+reset role;
+update public.notification_settings set daily_cap = 150 where id;
+
+-- Admins have their own switch.
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.expect_error($$select public.admin_set_suggestions(false)$$, 'Only admins can do this%');
+reset role;
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_suggestions(false);
+select tests.eq((public.admin_notification_status() ->> 'suggestions_enabled'), 'false', 'admin status shows the switch');
+reset role;
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.eq(public.suggestions_available()::text, 'false', 'switched off');
+select tests.expect_error(format($$select public.suggest_person(%L, 'limit.test4@ems-wi.com')$$, :'sg_post'), 'Suggestions are turned off for now%');
+reset role;
+set request.jwt.claim.sub = :'admin';
+set role authenticated;
+select public.admin_set_suggestions(true);
+select tests.eq((select count(*)::text from jsonb_array_elements(public.admin_notification_status() -> 'recent') r
+                 where r ->> 'kind' = 'suggestion' and r ->> 'person' = 'limit.test1@ems-wi.com'), '1', 'admin email log names who got a suggestion');
+select tests.eq((select count(*)::text from public.suggestions where opportunity_id = :'sg_post'), '3', 'admin sees every suggestion');
+reset role;
+
+-- Who sees suggestions: the suggester, the post's leads and admins.
+set request.jwt.claim.sub = :'ml_mem';
+set role authenticated;
+select tests.eq((select count(*)::text from public.suggestions), '2', 'members see the ones they sent');
+reset role;
+set request.jwt.claim.sub = :'ml_lead';
+set role authenticated;
+select tests.eq((select count(*)::text from public.suggestions where opportunity_id = :'sg_post'), '3', 'the post''s lead sees all for their post');
+reset role;
+set request.jwt.claim.sub = :'ml_other';
+set role authenticated;
+select tests.eq((select count(*)::text from public.suggestions), '0', 'others see none');
+reset role;
+
+-- Erasing a person removes suggestions to and from them.
+select tests.eq(public.erase_member_permanently('Limit.Test1@ems-wi.com'), 'limit.test1@ems-wi.com had not signed in; removed 1 waiting or suggestion record(s).', 'erase someone who never signed in');
+select tests.expect_error($$select public.erase_member_permanently('nobody.at.all@ems-wi.com')$$, 'No member with the email%');
+select tests.eq(left(public.erase_member_permanently('milo.member@ems-wi.com'), 6), 'Erased', 'erase a member who sent suggestions');
+select tests.eq((select count(*)::text from public.suggestions where suggested_email in ('limit.test1@ems-wi.com', 'otto.other@ems-wi.com')), '0', 'their suggestions are gone');
+select tests.eq((select count(*)::text from public.suggestions where suggested_email = 'zora.zebra@ems-wi.com'), '1', 'others'' suggestions stay');
 
 \o

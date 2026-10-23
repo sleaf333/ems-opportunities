@@ -23,6 +23,7 @@ export default function Privacy() {
           <li>Attendance or completion, if the organizer records it.</li>
           <li>The interest topics you pick, anything else you write in, and leadership goals, if you add them.</li>
           <li>Changes to posts and to roles (poster, admin), and requests to post, with who made them, so mistakes can be undone.</li>
+          <li>Suggestions: who suggested a colleague for a post, and when. The post's leads and site admins can see them.</li>
           <li>
             Whether a post's owners have ticked that they contacted you, and which reminder emails the site sent you
             (when and about which post, not the text).
@@ -46,6 +47,7 @@ export default function Privacy() {
             If you raise your hand and no one has marked you as contacted after three weeks: one follow-up
             with who to reach out to.
           </li>
+          <li>If a colleague suggests you for a post: one email saying who suggested you, with a link.</li>
           <li>You can turn the reminder emails off on your Profile at any time.</li>
         </ul>
 

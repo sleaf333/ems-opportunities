@@ -10,6 +10,7 @@ import type {
   RosterCheck,
   Signup,
   SignupCounts,
+  Suggestion,
 } from './types'
 
 // The group is small (~150 people), so pages load whole tables and filter in
@@ -62,27 +63,36 @@ export function fetchSignupsFor(opportunityId: string): Promise<Signup[]> {
 }
 
 // Member-list extras (0014): people a lead added who have not signed in yet,
-// and the latest "List is up to date" per post. The database only returns
-// rows for posts this person owns (all posts for admins). Any error, for
-// example before 0014 is run, gives empty results so pages still load.
+// and the latest "List is up to date" per post; plus suggestions (0015). The
+// database only returns rows for posts this person owns (all posts for
+// admins; suggestions also include the ones this person sent). Any error,
+// for example before 0014 or 0015 is run, gives empty results so pages
+// still load.
 export interface MemberListExtras {
   pending: PendingMember[]
   lastCheck: Map<string, RosterCheck>
+  suggestions: Suggestion[]
 }
 
 export async function fetchMemberListExtras(opportunityId?: string): Promise<MemberListExtras> {
   let pendingQuery = supabase.from('pending_members').select('*').order('email')
   let checksQuery = supabase.from('roster_checks').select('*').order('checked_at', { ascending: false }).order('id')
+  let suggestionsQuery = supabase.from('suggestions').select('*').order('created_at', { ascending: false }).order('id')
   if (opportunityId) {
     pendingQuery = pendingQuery.eq('opportunity_id', opportunityId)
     checksQuery = checksQuery.eq('opportunity_id', opportunityId).limit(1)
+    suggestionsQuery = suggestionsQuery.eq('opportunity_id', opportunityId)
   }
-  const [pending, checks] = await Promise.all([pendingQuery, checksQuery])
+  const [pending, checks, suggestions] = await Promise.all([pendingQuery, checksQuery, suggestionsQuery.limit(1000)])
   const lastCheck = new Map<string, RosterCheck>()
   for (const c of checks.error ? [] : (checks.data as RosterCheck[])) {
     if (!lastCheck.has(c.opportunity_id)) lastCheck.set(c.opportunity_id, c)
   }
-  return { pending: pending.error ? [] : (pending.data as PendingMember[]), lastCheck }
+  return {
+    pending: pending.error ? [] : (pending.data as PendingMember[]),
+    lastCheck,
+    suggestions: suggestions.error ? [] : (suggestions.data as Suggestion[]),
+  }
 }
 
 // All owners, or the owners of one post.

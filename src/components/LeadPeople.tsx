@@ -4,7 +4,7 @@ import ConfirmAction from './ConfirmAction'
 import PersonPicker from './PersonPicker'
 import { displayName, formatDate, POSITION_LABELS } from '../lib/format'
 import { friendlyError, supabase } from '../lib/supabase'
-import type { Opportunity, PendingMember, Profile, RosterCheck, Signup, SignupStatus } from '../lib/types'
+import type { Opportunity, PendingMember, Profile, RosterCheck, Signup, SignupStatus, Suggestion } from '../lib/types'
 
 type Decision = 'confirm' | 'not_selected' | 'undo' | 'remove'
 
@@ -30,6 +30,7 @@ export default function LeadPeople({
   people,
   pending = [],
   lastCheck = null,
+  suggestions = [],
   onChanged,
 }: {
   opp: Opportunity
@@ -37,6 +38,7 @@ export default function LeadPeople({
   people: Map<string, Profile>
   pending?: PendingMember[]
   lastCheck?: RosterCheck | null
+  suggestions?: Suggestion[]
   onChanged: () => Promise<void>
 }) {
   // Changes made here, shown straight away while the page reloads.
@@ -153,6 +155,27 @@ export default function LeadPeople({
   const checkDue =
     !lastCheck || Date.now() - Date.parse(lastCheck.checked_at) > CHECK_DUE_DAYS * 86_400_000
   const checkedBy = lastCheck?.checked_by ? people.get(lastCheck.checked_by) : undefined
+
+  // Suggestions from members (0015): who was suggested, by whom, and where
+  // they stand now.
+  const byEmail = new Map(Array.from(people.values()).map((p) => [p.email, p]))
+  const suggested = suggestions
+    .filter((x) => x.opportunity_id === opp.id)
+    .map((x) => {
+      const person = byEmail.get(x.suggested_email)
+      const signup = person ? signups.find((sg) => sg.user_id === person.id) : undefined
+      const now = signup ? statusOf(signup) : undefined
+      const standing =
+        now === 'committed' || now === 'completed' || pending.some((w) => w.email === x.suggested_email)
+          ? 'on the list'
+          : now === 'interested'
+            ? 'raised a hand'
+            : now === 'not_selected'
+              ? 'reviewed'
+              : ''
+      const by = x.suggested_by ? people.get(x.suggested_by) : undefined
+      return { x, person, standing, by }
+    })
 
   const name = (p: Profile) => (
     <span className="lead-name">
@@ -311,6 +334,29 @@ export default function LeadPeople({
                     Reconsider
                   </button>
                 </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {suggested.length > 0 && (
+        <details className="people-group suggested">
+          <summary>
+            Suggested by members <span className="count">{suggested.length}</span>
+          </summary>
+          <ul className="lead-rows">
+            {suggested.map(({ x, person, standing, by }) => (
+              <li key={x.id}>
+                <span className="lead-name">
+                  {person ? displayName(person) : x.suggested_email}
+                  <span className="small muted">
+                    {' '}
+                    · suggested by {by ? displayName(by) : 'a member'} on {formatDate(x.created_at)}
+                  </span>
+                  {x.note && <span className="small muted suggestion-note">"{x.note}"</span>}
+                </span>
+                {standing && <span className="tag">{standing}</span>}
               </li>
             ))}
           </ul>

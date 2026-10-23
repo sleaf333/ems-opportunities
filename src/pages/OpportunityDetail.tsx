@@ -27,6 +27,7 @@ import Description from '../components/Description'
 import EmailPeople from '../components/EmailPeople'
 import LeadPeople from '../components/LeadPeople'
 import PersonPicker from '../components/PersonPicker'
+import SuggestPerson from '../components/SuggestPerson'
 import LoadError from '../components/LoadError'
 import {
   byId,
@@ -94,7 +95,10 @@ export default function OpportunityDetail() {
     const waiting = await supabase.from('owner_presets').select('*').eq('opportunity_id', id).order('email')
     const pending = waiting.error ? [] : (waiting.data as OwnerPreset[])
     const extras = await fetchMemberListExtras(id)
-    return [opp, signups, profiles, counts.get(id), topics, owners, history, pending, extras] as const
+    // "Suggest someone" shows only when its emails can go out (0015).
+    const available = await supabase.rpc('suggestions_available')
+    const canSuggest = !available.error && available.data === true
+    return [opp, signups, profiles, counts.get(id), topics, owners, history, pending, extras, canSuggest] as const
   }, [id, profile.role])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -119,7 +123,7 @@ export default function OpportunityDetail() {
   if (loading && !data) return <p className="muted">Loading…</p>
   if (!data) return null
 
-  const [opp, signups, profiles, counts, topics, owners, history, pending, extras] = data
+  const [opp, signups, profiles, counts, topics, owners, history, pending, extras, canSuggest] = data
   if (!opp) {
     return (
       <div className="card">
@@ -362,6 +366,12 @@ export default function OpportunityDetail() {
             {actionError && <p className="error" role="alert">{actionError}</p>}
           </section>
 
+          {canSuggest && opp.status === 'open' && !expired && !deadlinePassed(opp) && (
+            <section className="panel stack">
+              <SuggestPerson opportunityId={opp.id} onSent={manages ? () => void reload() : undefined} />
+            </section>
+          )}
+
           <section className="panel stack">
             <h2 className="panel-title">Who's in</h2>
             {manages ? (
@@ -372,6 +382,7 @@ export default function OpportunityDetail() {
                   people={people}
                   pending={extras.pending}
                   lastCheck={extras.lastCheck.get(opp.id) ?? null}
+                  suggestions={extras.suggestions}
                   onChanged={reload}
                 />
                 <PeopleList title="Withdrawn" rows={group(['withdrawn', 'no_show'])} people={people} linked />
