@@ -6,6 +6,7 @@ import {
   fetchMemberListExtras,
   fetchOpportunities,
   fetchOpportunityCategories,
+  fetchOwners,
   fetchProfiles,
   fetchSignups,
   pageThrough,
@@ -22,7 +23,7 @@ import type {
 } from './types'
 
 export async function loadAdminData() {
-  const [profiles, opportunities, signups, categories, links, events, interests, memberCats, presets, roleChanges, backups, requests, memberLists] =
+  const [profiles, opportunities, signups, categories, links, events, interests, memberCats, presets, roleChanges, backups, requests, memberLists, owners] =
     await Promise.all([
       fetchProfiles(),
       fetchOpportunities(),
@@ -43,6 +44,7 @@ export async function loadAdminData() {
       supabase.from('backup_log').select('*').order('id', { ascending: false }).limit(1),
       supabase.from('post_requests').select('*').eq('status', 'pending').order('requested_at'),
       fetchMemberListExtras(),
+      fetchOwners(),
     ])
   for (const r of [roleChanges, backups, requests]) if (r.error) throw new Error(r.error.message)
   return {
@@ -60,6 +62,8 @@ export async function loadAdminData() {
     postRequests: requests.data as PostRequest[],
     // Waiting members and the latest "List is up to date" per post (0014).
     memberLists,
+    // Who leads each post (opportunity_owners).
+    owners,
   }
 }
 export type AdminData = Awaited<ReturnType<typeof loadAdminData>>

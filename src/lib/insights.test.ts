@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AdminData } from './adminData'
 import {
+  committeeHealth,
   eventScore,
   funnel,
   gaps,
@@ -103,6 +104,7 @@ function makeData(parts: Partial<AdminData>): AdminData {
     lastBackup: null,
     postRequests: [],
     memberLists: { pending: [], lastCheck: new Map(), suggestions: [] },
+    owners: [],
     ...parts,
   }
 }
@@ -271,3 +273,76 @@ describe('gaps', () => {
     expect(gaps(data, TODAY).emptyRegions).toEqual(['door_county', 'fox_valley', 'watertown'])
   })
 })
+
+describe('committeeHealth', () => {
+  const lead = person('lead', 'partner')
+  const data = makeData({
+    profiles: [lead, person('a', 'employed_physician'), person('b', 'apc'), person('w', 'partner')],
+    opportunities: [
+      opp('full', { title: 'Full committee', capacity: 2 }),
+      opp('empty', { title: 'Empty committee' }),
+      opp('evt', { title: 'An event', type: 'event' }),
+      opp('arch', { title: 'Archived', status: 'archived' }),
+    ],
+    signups: [
+      signup('a', 'full', 'committed'),
+      signup('b', 'full', 'committed'),
+      { ...signup('w', 'full', 'interested'), status_changed_at: daysAgo(20) },
+    ],
+    owners: [{ opportunity_id: 'full', user_id: 'lead', added_by: null, added_at: daysAgo(100) }],
+    memberLists: {
+      pending: [],
+      lastCheck: new Map([['full', { id: 1, opportunity_id: 'full', checked_by: 'lead', checked_at: daysAgo(10) }]]),
+      suggestions: [
+        { id: 1, opportunity_id: 'full', suggested_email: 'x@ems-wi.com', suggested_by: 'a', note: '', created_at: daysAgo(5) },
+        { id: 2, opportunity_id: 'full', suggested_email: 'y@ems-wi.com', suggested_by: 'a', note: '', created_at: daysAgo(200) },
+      ],
+    },
+  })
+
+  it('covers committees only (not events or archived posts), problems first', () => {
+    const rows = committeeHealth(data, 'all', TODAY)
+    expect(rows.map((r) => r.opportunity.id)).toEqual(['empty', 'full'])
+    expect(rows[0].flags).toEqual(['no_lead', 'no_members'])
+  })
+
+  it('a list check is due a year after the last one, or a year after a lead was added', () => {
+    const at = (checkAgo: number | null, leadAgo: number) =>
+      committeeHealth(
+        makeData({
+          ...data,
+          owners: [{ opportunity_id: 'full', user_id: 'lead', added_by: null, added_at: daysAgo(leadAgo) }],
+          memberLists: {
+            ...data.memberLists,
+            lastCheck: checkAgo === null ? new Map() : new Map([['full', { id: 1, opportunity_id: 'full', checked_by: 'lead', checked_at: daysAgo(checkAgo) }]]),
+          },
+        }),
+        'all',
+        TODAY,
+      ).find((r) => r.opportunity.id === 'full')!.flags.includes('list_due')
+    expect([at(10, 900), at(400, 900), at(null, 30), at(null, 400)]).toEqual([false, true, false, true])
+  })
+
+  it('counts members, seats, waiting, recent suggestions and the last check', () => {
+    const full = committeeHealth(data, 'all', TODAY).find((r) => r.opportunity.id === 'full')!
+    expect(full.leads.map((p) => p.id)).toEqual(['lead'])
+    expect([full.members, full.seatsTaken, full.capacity, full.waitingForDecision, full.oldestWaitDays, full.suggestions]).toEqual([2, 2, 2, 1, 20, 1])
+    expect(full.flags).toEqual(['waiting_long', 'full'])
+  })
+
+  it('member counts follow the position filter; seats do not', () => {
+    const full = committeeHealth(data, 'apc', TODAY).find((r) => r.opportunity.id === 'full')!
+    expect([full.members, full.seatsTaken]).toEqual([1, 2])
+  })
+
+  it('people added before signing in count toward seats and members-to-be', () => {
+    const withPending = makeData({
+      ...data,
+      memberLists: { ...data.memberLists, pending: [{ email: 'p@ems-wi.com', opportunity_id: 'empty', added_by: 'lead', created_at: daysAgo(1) }] },
+    })
+    const empty = committeeHealth(withPending, 'all', TODAY).find((r) => r.opportunity.id === 'empty')!
+    expect([empty.waitingToSignIn, empty.seatsTaken]).toEqual([1, 1])
+    expect(empty.flags).not.toContain('no_members')
+  })
+})
+
